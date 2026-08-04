@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      2.2
-// @description  ElevenLabs TTS Assistant with DOM & Network Limit Observer & Auto-Cookie Cleaner
+// @version      2.3
+// @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector (Cookie Clear -> Auto-VPN IP Switcher)
 // @match        https://elevenlabs.io/*
 // @grant        none
 // @run-at       document-start
@@ -17,6 +17,9 @@
     let lastCapturedBlob = null;
     let downloadedSizes = new Set();
     let isLimitClearedRecently = false;
+
+    // IP Switch State Tracking
+    let hasClearedCookiesForCurrentIP = false;
 
     // MediaSource buffer accumulator
     let mediaSourceChunks = [];
@@ -54,14 +57,64 @@
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/;domain=" + window.location.hostname);
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
             });
-            log('🧹 АВТО-ОЧИСТКА: Куки, LocalStorage и сессии сайта ElevenLabs очищены!', '#f59e0b');
-            showStatus('🚨 Лимит превышен! Данные очищены. Смените VPN и обновите страницу (F5).', '#ef4444');
+            log('🧹 АВТО-ОЧИСТКА: Куки, LocalStorage и сессии ElevenLabs сброшены!', '#f59e0b');
+            showStatus('🚨 Лимит! Куки очищены. Если окно появится снова — требуется смена IP в VPN.', '#ef4444');
         } catch(e) {
             console.error('[Clear Site Data Error]', e);
         }
     }
 
-    // --- 2. DOM LIMIT OBSERVER (Monitors on-screen "You've reached the limit" card modal) ---
+    // --- 2. SMART 2-STAGE LIMIT DETECTOR (Cookie Clear -> Auto-VPN IP Switch) ---
+    function triggerIPSwitchInVPN() {
+        log('🔄 [VPN Auto-Switch] Запрос на смену IP в расширениях браузера...', '#f59e0b');
+
+        // Send runtime message to VPN extensions (Urban VPN, VPNly, etc.)
+        const vpnExtIds = [
+            'eppiocemhmnlbhjplcgkofciiegomcon', // Urban VPN
+            'igkbbjcgncjmbebllchmcaaljbdflfij', // VPNly
+            'efaidnbmnnnibpcajpcglclefindmkaj'
+        ];
+
+        vpnExtIds.forEach(function(extId) {
+            try {
+                if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage(extId, { action: 'toggle_proxy', type: 'CHANGE_LOCATION', command: 'next' }, function(r) {});
+                }
+            } catch(e) {}
+        });
+
+        // Contact local Python IP switcher if active
+        try {
+            fetch('http://127.0.0.1:5000/switch_ip', { method: 'POST' }).then(function() {
+                log('✅ Сигнал смены IP отправлен на локальный помощник!', '#34d399');
+            }).catch(function() {});
+        } catch(e) {}
+
+        showStatus('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН! Смените страну в расширении VPN.', '#ef4444');
+    }
+
+    function handleLimitDetected(reason) {
+        if (isLimitClearedRecently) return;
+        isLimitClearedRecently = true;
+
+        if (!hasClearedCookiesForCurrentIP) {
+            // Stage 1: Clear cookies & LocalStorage
+            hasClearedCookiesForCurrentIP = true;
+            log('🚨 ЛИМИТ ДЕТЕКТИРОВАН (' + reason + ')! [Шаг 1: Авто-сброс куки]', '#ef4444');
+            clearSiteData();
+        } else {
+            // Stage 2: Cookies were ALREADY cleared on this IP, but limit returned! IP IS BLOCKED!
+            log('🚨 ОЧИСТКА КУКИ НЕ ПОМОГЛА! ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ!', '#ef4444');
+            log('⚡ [Шаг 2: Автоматический запуск смены IP в VPN расширении]', '#f59e0b');
+            clearSiteData();
+            triggerIPSwitchInVPN();
+            hasClearedCookiesForCurrentIP = false;
+        }
+
+        setTimeout(function() { isLimitClearedRecently = false; }, 4000);
+    }
+
+    // DOM Limit Observer
     function checkLimitModalOnDOM() {
         try {
             const bodyText = document.body ? (document.body.innerText || '') : '';
@@ -70,12 +123,7 @@
                 bodyText.indexOf("limit of generations as a logged-out user") !== -1 ||
                 bodyText.indexOf("reached the limit") !== -1) {
                 
-                if (!isLimitClearedRecently) {
-                    isLimitClearedRecently = true;
-                    log('🚨 ОБНАРУЖЕНО ОКНО ЛИМИТА НА ЭКРАНЕ! Авто-очистка куки...', '#ef4444');
-                    clearSiteData();
-                    setTimeout(function() { isLimitClearedRecently = false; }, 5000);
-                }
+                handleLimitDetected('Окно на экране');
             }
         } catch(e) {}
     }
@@ -116,6 +164,9 @@
         downloadedSizes.add(blob.size);
         lastCapturedBlob = blob;
 
+        // Reset IP block tracking on successful audio generation
+        hasClearedCookiesForCurrentIP = false;
+
         try {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -142,8 +193,7 @@
         
         // Detect quota / rate limit in response text
         if (text.indexOf('quota') !== -1 || text.indexOf('rate_limit') !== -1 || text.indexOf('unusual_activity') !== -1 || text.indexOf('anonymous_limit') !== -1 || text.indexOf('reached the limit') !== -1 || text.indexOf('logged-out user') !== -1) {
-            log('🚨 ДЕТЕКТИРОВАН ЛИМИТ В СЕТЕВОМ ОТВЕТЕ!', '#ef4444');
-            clearSiteData();
+            handleLimitDetected('Сетевой ответ сервера');
             return;
         }
 
@@ -182,8 +232,7 @@
 
             // Detect HTTP Status limits (429 Too Many Requests, 401, 403)
             if (response.status === 429 || response.status === 401 || response.status === 403) {
-                log('🚨 СЕРВЕР ВЕРНУЛ ОШИБКУ ЛИМИТА (HTTP ' + response.status + ')!', '#ef4444');
-                clearSiteData();
+                handleLimitDetected('HTTP Status ' + response.status);
             }
             
             if (url && (url.indexOf('text-to-speech') !== -1 || url.indexOf('/stream') !== -1 || url.indexOf('/v1/') !== -1)) {
@@ -380,7 +429,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs Assistant v2.2</span>',
+            '  <span>🎙️ ElevenLabs Assistant v2.3</span>',
             '  <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
             '</div>',
             '<div>',
@@ -410,7 +459,7 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен скрипт v2.2 с DOM-монитором окна лимита!');
+        log('Запущен смарт-скрипт v2.3 с 2-этапным детектором (Куки -> Авто-смена IP)!');
 
         document.getElementById('el-btn-clean-data').addEventListener('click', function() {
             clearSiteData();
