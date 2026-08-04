@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      2.1
-// @description  ElevenLabs TTS Assistant with Auto-Cookie Cleaner on IP/Quota Limit & Stream Reader
+// @version      2.2
+// @description  ElevenLabs TTS Assistant with DOM & Network Limit Observer & Auto-Cookie Cleaner
 // @match        https://elevenlabs.io/*
 // @grant        none
 // @run-at       document-start
@@ -16,6 +16,7 @@
     let isAutoPlay = true;
     let lastCapturedBlob = null;
     let downloadedSizes = new Set();
+    let isLimitClearedRecently = false;
 
     // MediaSource buffer accumulator
     let mediaSourceChunks = [];
@@ -53,14 +54,35 @@
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/;domain=" + window.location.hostname);
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
             });
-            log('🧹 АВТО-ОЧИСТКА: Куки, LocalStorage и Сессии сайта ElevenLabs сброшены!', '#f59e0b');
-            showStatus('🚨 Лимит превышен! Куки сброшены. Смените локацию VPN и нажмите F5.', '#ef4444');
+            log('🧹 АВТО-ОЧИСТКА: Куки, LocalStorage и сессии сайта ElevenLabs очищены!', '#f59e0b');
+            showStatus('🚨 Лимит превышен! Данные очищены. Смените VPN и обновите страницу (F5).', '#ef4444');
         } catch(e) {
             console.error('[Clear Site Data Error]', e);
         }
     }
 
-    // --- 2. BASE64 TO BLOB CONVERTER WITH URL-SAFE CLEANING ---
+    // --- 2. DOM LIMIT OBSERVER (Monitors on-screen "You've reached the limit" card modal) ---
+    function checkLimitModalOnDOM() {
+        try {
+            const bodyText = document.body ? (document.body.innerText || '') : '';
+            if (bodyText.indexOf("reached the limit of generations") !== -1 ||
+                bodyText.indexOf("Create a free account to continue generating") !== -1 ||
+                bodyText.indexOf("limit of generations as a logged-out user") !== -1 ||
+                bodyText.indexOf("reached the limit") !== -1) {
+                
+                if (!isLimitClearedRecently) {
+                    isLimitClearedRecently = true;
+                    log('🚨 ОБНАРУЖЕНО ОКНО ЛИМИТА НА ЭКРАНЕ! Авто-очистка куки...', '#ef4444');
+                    clearSiteData();
+                    setTimeout(function() { isLimitClearedRecently = false; }, 5000);
+                }
+            }
+        } catch(e) {}
+    }
+
+    setInterval(checkLimitModalOnDOM, 1000);
+
+    // --- 3. BASE64 TO BLOB CONVERTER WITH URL-SAFE CLEANING ---
     function base64ToBlob(base64, mimeType) {
         try {
             let b64 = base64.trim().replace(/-/g, '+').replace(/_/g, '/');
@@ -84,7 +106,7 @@
         }
     }
 
-    // --- 3. DOWNLOAD TRIGGER ---
+    // --- 4. DOWNLOAD TRIGGER ---
     function triggerDownload(blob, filename) {
         if (!blob || blob.size < 1000) return;
         if (downloadedSizes.has(blob.size)) {
@@ -114,13 +136,13 @@
         }
     }
 
-    // --- 4. STREAMING FETCH READER & LIMIT DETECTOR ---
+    // --- 5. STREAMING FETCH READER & LIMIT DETECTOR ---
     function parseAndDownloadBase64Stream(text) {
         if (!text) return;
         
         // Detect quota / rate limit in response text
-        if (text.indexOf('quota') !== -1 || text.indexOf('rate_limit') !== -1 || text.indexOf('unusual_activity') !== -1 || text.indexOf('anonymous_limit') !== -1) {
-            log('🚨 ДЕТЕКТИРОВАН ЛИМИТ В ОТВЕТЕ СЕРВЕРА!', '#ef4444');
+        if (text.indexOf('quota') !== -1 || text.indexOf('rate_limit') !== -1 || text.indexOf('unusual_activity') !== -1 || text.indexOf('anonymous_limit') !== -1 || text.indexOf('reached the limit') !== -1 || text.indexOf('logged-out user') !== -1) {
+            log('🚨 ДЕТЕКТИРОВАН ЛИМИТ В СЕТЕВОМ ОТВЕТЕ!', '#ef4444');
             clearSiteData();
             return;
         }
@@ -194,7 +216,7 @@
         return response;
     };
 
-    // --- 5. MEDIASOURCE ACCUMULATOR ---
+    // --- 6. MEDIASOURCE ACCUMULATOR ---
     if (window.SourceBuffer && SourceBuffer.prototype) {
         const origAppend = SourceBuffer.prototype.appendBuffer;
         SourceBuffer.prototype.appendBuffer = function(buffer) {
@@ -218,7 +240,7 @@
         };
     }
 
-    // --- 6. FORCE MANUAL DOWNLOAD ---
+    // --- 7. FORCE MANUAL DOWNLOAD ---
     async function forceDownloadCurrentAudio() {
         if (lastCapturedBlob) {
             const numStr = (currentChunkIdx + 1 < 10 ? '0' : '') + (currentChunkIdx + 1);
@@ -231,7 +253,7 @@
         return false;
     }
 
-    // --- 7. TEXT CHUNKING ---
+    // --- 8. TEXT CHUNKING ---
     function splitText(text, maxLen) {
         if (!maxLen) maxLen = 920;
         const sentences = text.replace(/([.!?…])\s+/g, "$1|").split("|");
@@ -254,7 +276,7 @@
         return res;
     }
 
-    // --- 8. FINDERS & REACT INJECTION ---
+    // --- 9. FINDERS & REACT INJECTION ---
     function findTextarea() {
         return document.querySelector('textarea') || 
                document.querySelector('div[contenteditable="true"]') || 
@@ -336,7 +358,7 @@
         updateUI();
     }
 
-    // --- 9. FLOATING UI WIDGET ---
+    // --- 10. FLOATING UI WIDGET ---
     function createWidget() {
         if (document.getElementById('el-assistant-widget')) return;
 
@@ -358,7 +380,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs Assistant v2.1</span>',
+            '  <span>🎙️ ElevenLabs Assistant v2.2</span>',
             '  <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
             '</div>',
             '<div>',
@@ -388,7 +410,7 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен скрипт v2.1 с авто-очисткой куки при лимите!');
+        log('Запущен скрипт v2.2 с DOM-монитором окна лимита!');
 
         document.getElementById('el-btn-clean-data').addEventListener('click', function() {
             clearSiteData();
