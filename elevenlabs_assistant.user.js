@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  ElevenLabs TTS Assistant with Stream Reader & Single File Reassembler
+// @version      2.1
+// @description  ElevenLabs TTS Assistant with Auto-Cookie Cleaner on IP/Quota Limit & Stream Reader
 // @match        https://elevenlabs.io/*
 // @grant        none
 // @run-at       document-start
@@ -44,7 +44,23 @@
         }
     }
 
-    // --- 1. BASE64 TO BLOB CONVERTER WITH URL-SAFE CLEANING ---
+    // --- 1. COOKIE AND SITE STORAGE AUTO-CLEANER ---
+    function clearSiteData() {
+        try {
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            document.cookie.split(";").forEach(function(c) {
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/;domain=" + window.location.hostname);
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            });
+            log('🧹 АВТО-ОЧИСТКА: Куки, LocalStorage и Сессии сайта ElevenLabs сброшены!', '#f59e0b');
+            showStatus('🚨 Лимит превышен! Куки сброшены. Смените локацию VPN и нажмите F5.', '#ef4444');
+        } catch(e) {
+            console.error('[Clear Site Data Error]', e);
+        }
+    }
+
+    // --- 2. BASE64 TO BLOB CONVERTER WITH URL-SAFE CLEANING ---
     function base64ToBlob(base64, mimeType) {
         try {
             let b64 = base64.trim().replace(/-/g, '+').replace(/_/g, '/');
@@ -68,7 +84,7 @@
         }
     }
 
-    // --- 2. DOWNLOAD TRIGGER ---
+    // --- 3. DOWNLOAD TRIGGER ---
     function triggerDownload(blob, filename) {
         if (!blob || blob.size < 1000) return;
         if (downloadedSizes.has(blob.size)) {
@@ -98,9 +114,17 @@
         }
     }
 
-    // --- 3. STREAMING FETCH READER (Reads 100% of base64 chunks until finish) ---
+    // --- 4. STREAMING FETCH READER & LIMIT DETECTOR ---
     function parseAndDownloadBase64Stream(text) {
         if (!text) return;
+        
+        // Detect quota / rate limit in response text
+        if (text.indexOf('quota') !== -1 || text.indexOf('rate_limit') !== -1 || text.indexOf('unusual_activity') !== -1 || text.indexOf('anonymous_limit') !== -1) {
+            log('🚨 ДЕТЕКТИРОВАН ЛИМИТ В ОТВЕТЕ СЕРВЕРА!', '#ef4444');
+            clearSiteData();
+            return;
+        }
+
         let base64Parts = [];
         const lines = text.split('\n');
         
@@ -133,6 +157,12 @@
         try {
             const arg0 = arguments[0];
             const url = arg0 ? (typeof arg0 === 'string' ? arg0 : arg0.url) : '';
+
+            // Detect HTTP Status limits (429 Too Many Requests, 401, 403)
+            if (response.status === 429 || response.status === 401 || response.status === 403) {
+                log('🚨 СЕРВЕР ВЕРНУЛ ОШИБКУ ЛИМИТА (HTTP ' + response.status + ')!', '#ef4444');
+                clearSiteData();
+            }
             
             if (url && (url.indexOf('text-to-speech') !== -1 || url.indexOf('/stream') !== -1 || url.indexOf('/v1/') !== -1)) {
                 log('🌐 [Fetch Interceptor] Начало потокового чтения API...', '#fbbf24');
@@ -150,7 +180,7 @@
                                 fullText += decoder.decode(result.value, { stream: true });
                             }
                             if (result.done) {
-                                log('🏁 Поток сервера завершен. Распознавание ' + fullText.length + ' символов ответа...', '#34d399');
+                                log('🏁 Поток сервера завершен. Проверка ' + fullText.length + ' символов ответа...', '#34d399');
                                 parseAndDownloadBase64Stream(fullText);
                             } else {
                                 readStream();
@@ -164,7 +194,7 @@
         return response;
     };
 
-    // --- 4. MEDIASOURCE ACCUMULATOR (Fallback if stream reader isn't active) ---
+    // --- 5. MEDIASOURCE ACCUMULATOR ---
     if (window.SourceBuffer && SourceBuffer.prototype) {
         const origAppend = SourceBuffer.prototype.appendBuffer;
         SourceBuffer.prototype.appendBuffer = function(buffer) {
@@ -174,7 +204,7 @@
                 if (mediaSourceTimer) clearTimeout(mediaSourceTimer);
                 mediaSourceTimer = setTimeout(function() {
                     if (mediaSourceChunks.length > 0 && !isFetchStreamHandled) {
-                        log('📦 Сборка ' + mediaSourceChunks.length + ' чанков MediaSource (Fallback)...', '#a78bfa');
+                        log('📦 Сборка ' + mediaSourceChunks.length + ' чанков MediaSource...', '#a78bfa');
                         const combinedBlob = new Blob(mediaSourceChunks, { type: 'audio/mp3' });
                         mediaSourceChunks = [];
                         const numStr = (currentChunkIdx + 1 < 10 ? '0' : '') + (currentChunkIdx + 1);
@@ -188,7 +218,7 @@
         };
     }
 
-    // --- 5. FORCE MANUAL DOWNLOAD ---
+    // --- 6. FORCE MANUAL DOWNLOAD ---
     async function forceDownloadCurrentAudio() {
         if (lastCapturedBlob) {
             const numStr = (currentChunkIdx + 1 < 10 ? '0' : '') + (currentChunkIdx + 1);
@@ -201,7 +231,7 @@
         return false;
     }
 
-    // --- 6. TEXT CHUNKING ---
+    // --- 7. TEXT CHUNKING ---
     function splitText(text, maxLen) {
         if (!maxLen) maxLen = 920;
         const sentences = text.replace(/([.!?…])\s+/g, "$1|").split("|");
@@ -224,7 +254,7 @@
         return res;
     }
 
-    // --- 7. FINDERS & REACT INJECTION ---
+    // --- 8. FINDERS & REACT INJECTION ---
     function findTextarea() {
         return document.querySelector('textarea') || 
                document.querySelector('div[contenteditable="true"]') || 
@@ -306,7 +336,7 @@
         updateUI();
     }
 
-    // --- 8. FLOATING UI WIDGET ---
+    // --- 9. FLOATING UI WIDGET ---
     function createWidget() {
         if (document.getElementById('el-assistant-widget')) return;
 
@@ -321,14 +351,15 @@
             '.el-btn:hover { opacity: 0.9; transform: translateY(-1px); }',
             '.el-btn-sec { background: rgba(51, 65, 85, 0.9); color: #cbd5e1; }',
             '.el-btn-green { background: linear-gradient(135deg, #10b981, #059669); font-size: 13px; }',
+            '.el-btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); font-size: 11px; padding: 4px 8px; }',
             '#el-status-bar { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 11px; background: rgba(30, 41, 59, 0.9); color: #94a3b8; word-break: break-word; line-height: 1.4; }',
             '#el-debug-log { height: 95px; overflow-y: auto; background: #020617; color: #38bdf8; font-family: monospace; font-size: 10px; padding: 6px; border-radius: 6px; margin-top: 8px; border: 1px solid rgba(255,255,255,0.1); }',
             '.el-flex { display: flex; gap: 8px; margin-top: 8px; }',
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs Assistant v2.0</span>',
-            '  <span id="el-chunk-badge" class="el-badge">0 кусков</span>',
+            '  <span>🎙️ ElevenLabs Assistant v2.1</span>',
+            '  <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
             '</div>',
             '<div>',
             '  <textarea id="el-full-text-input" placeholder="Вставьте весь текст сказки сюда..."></textarea>',
@@ -357,7 +388,11 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v2.0 (Ручной выбор голоса)');
+        log('Запущен скрипт v2.1 с авто-очисткой куки при лимите!');
+
+        document.getElementById('el-btn-clean-data').addEventListener('click', function() {
+            clearSiteData();
+        });
 
         document.getElementById('el-btn-process').addEventListener('click', function() {
             const raw = document.getElementById('el-full-text-input').value.trim();
