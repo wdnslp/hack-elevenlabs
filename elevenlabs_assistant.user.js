@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      2.3
-// @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector (Cookie Clear -> Auto-VPN IP Switcher)
+// @version      2.6
+// @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
 
@@ -17,6 +19,11 @@
     let lastCapturedBlob = null;
     let downloadedSizes = new Set();
     let isLimitClearedRecently = false;
+    let activeStoryData = null;
+    let lastHandledStoryId = "";
+
+    const LOCAL_SERVER_STORY_URL = "http://127.0.0.1:5000/api/story";
+    const LOCAL_SERVER_UPLOAD_URL = "http://127.0.0.1:5000/api/upload_chunk";
 
     // IP Switch State Tracking
     let hasClearedCookiesForCurrentIP = false;
@@ -48,6 +55,132 @@
         }
     }
 
+    // --- LOCAL SERVER FETCHING & BATCH POLLING ---
+    function fetchStoryFromLocalServer(isAutoPoll) {
+        if (!isAutoPoll) {
+            log('📡 Запрос истории с локального сервера (' + LOCAL_SERVER_STORY_URL + ')...', '#38bdf8');
+            showStatus('📡 Запрос истории с локального сервера Python...', '#3b82f6');
+        }
+
+        const processResponse = function(dataStr) {
+            try {
+                const data = JSON.parse(dataStr);
+                if (!data || !data.story_id) return;
+                
+                if (data.story_id === lastHandledStoryId && isAutoPoll) {
+                    return; // No new story yet
+                }
+
+                const textToUse = data.formatted_text || data.full_text || (data.title ? (data.title + "\n\n" + (data.body || "")) : "");
+                if (textToUse && textToUse.trim().length > 10) {
+                    activeStoryData = data;
+                    lastHandledStoryId = data.story_id;
+
+                    const inputEl = document.getElementById('el-full-text-input');
+                    if (inputEl) inputEl.value = textToUse.trim();
+                    
+                    chunks = splitText(textToUse.trim());
+                    currentChunkIdx = 0;
+                    document.getElementById('el-chunk-controls').style.display = 'block';
+                    
+                    const storyTitle = data.title ? (data.title.substring(0, 45) + '...') : 'История';
+                    const subInfo = data.subreddit ? ('r/' + data.subreddit) : 'Reddit';
+                    const batchProgress = (data.story_idx && data.total_stories) ? (' [' + data.story_idx + '/' + data.total_stories + ']') : '';
+                    
+                    log('🎉 АВТО-ПОДТЯНУТА ИСТОРИЯ' + batchProgress + ' [' + subInfo + ']: "' + storyTitle + '" (' + chunks.length + ' кусков)!', '#10b981');
+                    showStatus('✅ Подтянута история' + batchProgress + ': "' + storyTitle + '" (' + chunks.length + ' кусков)', '#10b981');
+                    updateUI();
+                } else if (!isAutoPoll) {
+                    log('⚠️ На сервере нет готовой истории (статус: idle).', '#f59e0b');
+                    showStatus('⚠️ На локальном сервере нет подгруженной истории.', '#f59e0b');
+                }
+            } catch (e) {
+                if (!isAutoPoll) {
+                    log('❌ Ошибка парсинга ответа сервера: ' + e.message, '#ef4444');
+                    showStatus('❌ Ошибка парсинга ответа сервера.', '#ef4444');
+                }
+            }
+        };
+
+        if (typeof GM_xmlhttpRequest === 'function') {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: LOCAL_SERVER_STORY_URL,
+                onload: function(res) { processResponse(res.responseText); }
+            });
+        } else {
+            fetch(LOCAL_SERVER_STORY_URL)
+                .then(r => r.text())
+                .then(txt => processResponse(txt))
+                .catch(err => {});
+        }
+    }
+
+    // Auto-poll server for next story in batch every 3 seconds
+    setInterval(function() {
+        fetchStoryFromLocalServer(true);
+    }, 3000);
+
+    // --- UPLOAD AUDIO CHUNK DIRECTLY TO PYTHON SERVER ---
+    function sendAudioChunkToServer(blob, chunkIdx, totalChunks) {
+        if (!blob) return;
+        const storyId = (activeStoryData && activeStoryData.story_id) ? activeStoryData.story_id : "default_story";
+
+        log('🚀 Отправка аудио куска ' + (chunkIdx + 1) + '/' + totalChunks + ' на локальный Python сервер...', '#a78bfa');
+        showStatus('🚀 Отправка куска ' + (chunkIdx + 1) + '/' + totalChunks + ' в Python...', '#a78bfa');
+
+        const reader = new FileReader();
+        reader.onloadend = function() {
+            const base64Data = reader.result.split(',')[1] || reader.result;
+            const payload = JSON.stringify({
+                story_id: storyId,
+                chunk_idx: chunkIdx,
+                total_chunks: totalChunks,
+                audio_base64: base64Data
+            });
+
+            const onUploadSuccess = function(respStr) {
+                try {
+                    const resp = JSON.parse(respStr);
+                    log('✅ КУСОК ' + (chunkIdx + 1) + '/' + totalChunks + ' УСПЕШНО ПЕРЕДАН В PYTHON! (' + resp.received_count + '/' + resp.total_chunks + ')', '#10b981');
+                    if (resp.is_complete) {
+                        log('🎉 ВСЕ КУСКИ ИСТОРИИ ОЗВУЧЕНЫ! Python начал генерацию видео...', '#f59e0b');
+                        showStatus('🎉 История полностью передана! Ожидайте следующую...', '#10b981');
+                    } else {
+                        showStatus('✅ Кусок ' + (chunkIdx + 1) + '/' + totalChunks + ' передан в Python. Жмите дальше!', '#10b981');
+                    }
+                } catch(e) {}
+            };
+
+            if (typeof GM_xmlhttpRequest === 'function') {
+                GM_xmlhttpRequest({
+                    method: "POST",
+                    url: LOCAL_SERVER_UPLOAD_URL,
+                    headers: { "Content-Type": "application/json" },
+                    data: payload,
+                    onload: function(res) { onUploadSuccess(res.responseText); },
+                    onerror: function(err) {
+                        log('❌ Ошибка отправки аудио в Python (GM_XHR): ' + (err ? (err.statusText || err.responseText || JSON.stringify(err)) : 'Сбой сети'), '#ef4444');
+                        showStatus('❌ Ошибка связи с Python при отправке аудио!', '#ef4444');
+                    }
+                });
+            } else {
+                fetch(LOCAL_SERVER_UPLOAD_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: payload
+                })
+                .then(r => r.text())
+                .then(txt => onUploadSuccess(txt))
+                .catch(err => {
+                    log('❌ Ошибка отправки аудио в Python (Fetch): ' + err.message, '#ef4444');
+                    showStatus('❌ Ошибка связи с Python при отправке аудио!', '#ef4444');
+                });
+            }
+        };
+        reader.readAsDataURL(blob);
+    }
+
     // --- 1. COOKIE AND SITE STORAGE AUTO-CLEANER ---
     function clearSiteData() {
         try {
@@ -64,33 +197,10 @@
         }
     }
 
-    // --- 2. SMART 2-STAGE LIMIT DETECTOR (Cookie Clear -> Auto-VPN IP Switch) ---
+    // --- 2. SMART 2-STAGE LIMIT DETECTOR ---
     function triggerIPSwitchInVPN() {
-        log('🔄 [VPN Auto-Switch] Запрос на смену IP в расширениях браузера...', '#f59e0b');
-
-        // Send runtime message to VPN extensions (Urban VPN, VPNly, etc.)
-        const vpnExtIds = [
-            'eppiocemhmnlbhjplcgkofciiegomcon', // Urban VPN
-            'igkbbjcgncjmbebllchmcaaljbdflfij', // VPNly
-            'efaidnbmnnnibpcajpcglclefindmkaj'
-        ];
-
-        vpnExtIds.forEach(function(extId) {
-            try {
-                if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) {
-                    chrome.runtime.sendMessage(extId, { action: 'toggle_proxy', type: 'CHANGE_LOCATION', command: 'next' }, function(r) {});
-                }
-            } catch(e) {}
-        });
-
-        // Contact local Python IP switcher if active
-        try {
-            fetch('http://127.0.0.1:5000/switch_ip', { method: 'POST' }).then(function() {
-                log('✅ Сигнал смены IP отправлен на локальный помощник!', '#34d399');
-            }).catch(function() {});
-        } catch(e) {}
-
-        showStatus('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН! Смените страну в расширении VPN.', '#ef4444');
+        log('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ! Смените локацию в Turbo VPN вручную.', '#f59e0b');
+        showStatus('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН! Пожалуйста, переключите страну в Turbo VPN вручную.', '#ef4444');
     }
 
     function handleLimitDetected(reason) {
@@ -98,14 +208,12 @@
         isLimitClearedRecently = true;
 
         if (!hasClearedCookiesForCurrentIP) {
-            // Stage 1: Clear cookies & LocalStorage
             hasClearedCookiesForCurrentIP = true;
             log('🚨 ЛИМИТ ДЕТЕКТИРОВАН (' + reason + ')! [Шаг 1: Авто-сброс куки]', '#ef4444');
             clearSiteData();
         } else {
-            // Stage 2: Cookies were ALREADY cleared on this IP, but limit returned! IP IS BLOCKED!
             log('🚨 ОЧИСТКА КУКИ НЕ ПОМОГЛА! ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ!', '#ef4444');
-            log('⚡ [Шаг 2: Автоматический запуск смены IP в VPN расширении]', '#f59e0b');
+            log('⚡ [Шаг 2: Ручное переключение IP в Turbo VPN]', '#f59e0b');
             clearSiteData();
             triggerIPSwitchInVPN();
             hasClearedCookiesForCurrentIP = false;
@@ -114,84 +222,53 @@
         setTimeout(function() { isLimitClearedRecently = false; }, 4000);
     }
 
-    // DOM Limit Observer
     function checkLimitModalOnDOM() {
         try {
             const bodyText = document.body ? (document.body.innerText || '') : '';
             if (bodyText.indexOf("reached the limit of generations") !== -1 ||
                 bodyText.indexOf("Create a free account to continue generating") !== -1 ||
                 bodyText.indexOf("limit of generations as a logged-out user") !== -1 ||
-                bodyText.indexOf("reached the limit") !== -1) {
+                bodyText.indexOf("Unusual activity detected") !== -1) {
                 
-                handleLimitDetected('Окно на экране');
+                handleLimitDetected('DOM Модальное окно лимита');
             }
         } catch(e) {}
     }
 
-    setInterval(checkLimitModalOnDOM, 1000);
+    setInterval(checkLimitModalOnDOM, 2500);
 
     // --- 3. BASE64 TO BLOB CONVERTER WITH URL-SAFE CLEANING ---
     function base64ToBlob(base64, mimeType) {
         try {
-            let b64 = base64.trim().replace(/-/g, '+').replace(/_/g, '/');
-            while (b64.length % 4 !== 0) {
-                b64 += '=';
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-            const byteCharacters = atob(b64);
-            const byteArrays = [];
-            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-                const slice = byteCharacters.slice(offset, offset + 512);
-                const byteNumbers = new Array(slice.length);
-                for (let i = 0; i < slice.length; i++) {
-                    byteNumbers[i] = slice.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                byteArrays.push(byteArray);
-            }
-            return new Blob(byteArrays, { type: mimeType || 'audio/mp3' });
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType || 'audio/mp3' });
         } catch (e) {
             return null;
         }
     }
 
-    // --- 4. DOWNLOAD TRIGGER ---
+    // --- 4. DOWNLOAD & AUTO-UPLOAD TRIGGER ---
     function triggerDownload(blob, filename) {
-        if (!blob || blob.size < 1000) return;
-        if (downloadedSizes.has(blob.size)) {
-            log('⚠️ Пропущен дубликат размера ' + (blob.size / 1024).toFixed(1) + ' KB', '#64748b');
-            return;
-        }
+        if (!blob || blob.size < 3000) return;
+        if (downloadedSizes.has(blob.size)) return;
         downloadedSizes.add(blob.size);
         lastCapturedBlob = blob;
-
-        // Reset IP block tracking on successful audio generation
         hasClearedCookiesForCurrentIP = false;
 
-        try {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(function() {
-                if (a.parentNode) a.parentNode.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 1500);
-            log('🎉 СКАЧАН ЕДИНЫЙ ПОЛНЫЙ МЕДИАФАЙЛ: ' + filename + ' (' + (blob.size / 1024).toFixed(1) + ' KB)', '#10b981');
-            showStatus('✅ Успешно скачан: ' + filename + ' (' + (blob.size / 1024).toFixed(1) + ' KB)', '#10b981');
-        } catch (e) {
-            log('❌ Ошибка сохранения: ' + e.message, '#ef4444');
-            showStatus('❌ Ошибка сохранения: ' + e.message, '#ef4444');
-        }
+        // Auto-upload chunk directly to Python server over HTTP API (no browser disk file download needed)
+        sendAudioChunkToServer(blob, currentChunkIdx, chunks.length || 1);
+        log('⚡ АУДИО ОЗВУЧЕНО: (' + (blob.size / 1024).toFixed(1) + ' KB) -> Отправлено в Python!', '#10b981');
     }
 
     // --- 5. STREAMING FETCH READER & LIMIT DETECTOR ---
     function parseAndDownloadBase64Stream(text) {
         if (!text) return;
         
-        // Detect quota / rate limit in response text
         if (text.indexOf('quota') !== -1 || text.indexOf('rate_limit') !== -1 || text.indexOf('unusual_activity') !== -1 || text.indexOf('anonymous_limit') !== -1 || text.indexOf('reached the limit') !== -1 || text.indexOf('logged-out user') !== -1) {
             handleLimitDetected('Сетевой ответ сервера');
             return;
@@ -230,7 +307,6 @@
             const arg0 = arguments[0];
             const url = arg0 ? (typeof arg0 === 'string' ? arg0 : arg0.url) : '';
 
-            // Detect HTTP Status limits (429 Too Many Requests, 401, 403)
             if (response.status === 429 || response.status === 401 || response.status === 403) {
                 handleLimitDetected('HTTP Status ' + response.status);
             }
@@ -421,6 +497,7 @@
             '.el-btn { background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }',
             '.el-btn:hover { opacity: 0.9; transform: translateY(-1px); }',
             '.el-btn-sec { background: rgba(51, 65, 85, 0.9); color: #cbd5e1; }',
+            '.el-btn-sky { background: linear-gradient(135deg, #0284c7, #0369a1); font-size: 12px; width: 100%; margin-bottom: 6px; }',
             '.el-btn-green { background: linear-gradient(135deg, #10b981, #059669); font-size: 13px; }',
             '.el-btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); font-size: 11px; padding: 4px 8px; }',
             '#el-status-bar { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 11px; background: rgba(30, 41, 59, 0.9); color: #94a3b8; word-break: break-word; line-height: 1.4; }',
@@ -429,11 +506,12 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs Assistant v2.3</span>',
+            '  <span>🎙️ ElevenLabs Assistant v2.6</span>',
             '  <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
             '</div>',
             '<div>',
-            '  <textarea id="el-full-text-input" placeholder="Вставьте весь текст сказки сюда..."></textarea>',
+            '  <button id="el-btn-fetch-server" class="el-btn el-btn-sky">📡 Подтянуть историю с сервера (127.0.0.1:5000)</button>',
+            '  <textarea id="el-full-text-input" placeholder="Вставьте весь текст сказки сюда или нажмите «Подтянуть с сервера»..."></textarea>',
             '</div>',
             '<div class="el-flex">',
             '  <button id="el-btn-process" class="el-btn" style="flex: 1;">✂️ Нарезать текст</button>',
@@ -454,21 +532,25 @@
             '    <button id="el-btn-download-now" class="el-btn el-btn-green" style="width: 100%;">⬇️ Скачать MP3 этого куска</button>',
             '  </div>',
             '</div>',
-            '<div id="el-status-bar">Готов к работе. Вставьте текст и нажмите «Нарезать».</div>',
-            '<div id="el-debug-log"><div>[Логи дебага появится здесь]</div></div>'
+            '<div id="el-status-bar">Готов к работе. Включен авто-пакетный режим с Python!</div>',
+            '<div id="el-debug-log"><div>[Логи дебага появятся здесь]</div></div>'
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен смарт-скрипт v2.3 с 2-этапным детектором (Куки -> Авто-смена IP)!');
+        log('Запущен ElevenLabs Assistant v2.6 (Автоматический пакетный режим)!');
 
         document.getElementById('el-btn-clean-data').addEventListener('click', function() {
             clearSiteData();
         });
 
+        document.getElementById('el-btn-fetch-server').addEventListener('click', function() {
+            fetchStoryFromLocalServer(false);
+        });
+
         document.getElementById('el-btn-process').addEventListener('click', function() {
             const raw = document.getElementById('el-full-text-input').value.trim();
             if (!raw) {
-                alert('Вставьте текст сказки!');
+                alert('Вставьте текст сказки или подтяните с сервера!');
                 return;
             }
             chunks = splitText(raw);
@@ -496,17 +578,18 @@
         document.getElementById('el-auto-play').addEventListener('change', function(e) {
             isAutoPlay = e.target.checked;
         });
+
+        setTimeout(function() { fetchStoryFromLocalServer(false); }, 1000);
     }
 
     function updateUI() {
-        const badge = document.getElementById('el-chunk-badge');
         const info = document.getElementById('el-chunk-info');
         const playBtn = document.getElementById('el-btn-play');
 
-        if (badge) badge.textContent = chunks.length + ' кусков';
         if (info && chunks.length) {
             const len = chunks[currentChunkIdx] ? chunks[currentChunkIdx].length : 0;
-            info.textContent = 'Кусок ' + (currentChunkIdx + 1) + ' из ' + chunks.length + ' (' + len + ' симв.)';
+            const storyProgress = (activeStoryData && activeStoryData.story_idx && activeStoryData.total_stories) ? (' [Ист. ' + activeStoryData.story_idx + '/' + activeStoryData.total_stories + ']') : '';
+            info.textContent = 'Кусок ' + (currentChunkIdx + 1) + ' из ' + chunks.length + storyProgress + ' (' + len + ' симв.)';
         }
         if (playBtn && chunks.length) {
             playBtn.textContent = '🚀 Озвучить кусок ' + (currentChunkIdx + 1);
