@@ -55,7 +55,7 @@ def clean_reddit_text(text: str) -> str:
     text = re.sub(r'https?://\S+|www\.\S+', '', text)
     text = re.sub(r'[\*#_~`]', '', text)
     # Remove single line edits/updates without truncating the rest of the story
-    text = re.sub(r'(?m)^\s*(?i)(edit|update|tldr|tl;dr):.*$', '', text)
+    text = re.sub(r'^\s*(edit|update|tldr|tl;dr):.*$', '', text, flags=re.MULTILINE | re.IGNORECASE)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -82,7 +82,46 @@ def fetch_top_stories(
     min_words: int = 40,
     max_words: int = 1500
 ) -> List[Dict[str, Any]]:
-    """Fetch stories using direct HTTP, CDP fallback, or sample stories."""
+    """Fetch stories using PullPush live API mirror, direct HTTP, CDP fallback, or sample stories."""
+    valid_stories = []
+
+    # Priority 1: PullPush Live Reddit Mirror API
+    pullpush_url = f"https://api.pullpush.io/reddit/submission/search/?subreddit={subreddit}&size={limit}"
+    try:
+        req = urllib.request.Request(pullpush_url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            raw_json = json.loads(resp.read().decode('utf-8'))
+            items = raw_json.get("data", [])
+            for post_data in items:
+                title = post_data.get("title", "").strip()
+                body = clean_reddit_text(post_data.get("selftext", ""))
+                upvotes = post_data.get("score", post_data.get("ups", 0))
+                num_comments = post_data.get("num_comments", 0)
+                author = post_data.get("author", "anonymous")
+                post_id = post_data.get("id", "")
+                
+                full_text = f"{title}. {body}".strip() if body else title
+                words = len(full_text.split())
+                
+                if words >= min_words and words <= max_words:
+                    valid_stories.append({
+                        "id": post_id or f"post_{len(valid_stories)+1}",
+                        "subreddit": subreddit,
+                        "author": author,
+                        "title": title,
+                        "body": body,
+                        "full_text": full_text,
+                        "upvotes": upvotes,
+                        "num_comments": num_comments,
+                        "word_count": words
+                    })
+            if valid_stories:
+                print(f"🔥 Successfully scraped {len(valid_stories)} live Reddit stories from r/{subreddit} via PullPush!")
+                return valid_stories
+    except Exception as e:
+        print(f"⚠️ PullPush live API notice: {e}")
+
+    # Priority 2: Direct Reddit HTTP JSON Endpoints
     urls = [
         f"https://www.reddit.com/r/{subreddit}/top.json?t={time_filter}&limit={limit}",
         f"https://old.reddit.com/r/{subreddit}/top.json?t={time_filter}&limit={limit}"
@@ -94,9 +133,7 @@ def fetch_top_stories(
         "Accept-Language": "en-US,en;q=0.9"
     }
 
-    valid_stories = []
     data = None
-
     for url in urls:
         try:
             req = urllib.request.Request(url, headers=headers)
