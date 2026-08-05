@@ -108,8 +108,8 @@ def assemble_tiktok_video(
             f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];" + vf_filter,
             "-map", "[outv]",
             "-map", "2:a",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-c:a", "aac", "-b:a", "192k",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "18M",
+            "-c:a", "aac", "-b:a", "256k",
             "-t", str(duration),
             abs_out
         ]
@@ -125,8 +125,8 @@ def assemble_tiktok_video(
             f"[0:v]null[bg];" + vf_filter,
             "-map", "[outv]",
             "-map", "2:a",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-c:a", "aac", "-b:a", "192k",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "18M",
+            "-c:a", "aac", "-b:a", "256k",
             "-t", str(duration),
             abs_out
         ]
