@@ -129,7 +129,13 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
             f"Оригинальный заголовок:\n{title}\n\nОригинальная история:\n{body}"
         )
 
-        for model_name in ["models/gemini-3.5-flash-lite", "models/gemini-3.1-flash-lite", "models/gemini-3.5-flash"]:
+        for model_name in [
+            "models/gemini-3.5-flash-lite",
+            "models/gemini-3.1-flash-lite",
+            "models/gemini-2.5-flash-lite",
+            "models/gemini-3.5-flash",
+            "models/gemini-2.5-flash"
+        ]:
             try:
                 print(f"🤖 Requesting Gemini translation & ElevenLabs audio tags from {model_name}...")
                 resp = client.models.generate_content(
@@ -142,7 +148,7 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
                     print(f"✨ {model_name} successfully translated & tagged story!")
                     return clean_text
             except Exception as model_err:
-                print(f"⚠️ {model_name} notice: {model_err}")
+                print(f"⚠️ {model_name} unavailable, trying next model: {model_err}")
                 continue
     except Exception as e:
         print(f"⚠️ Gemini translation notice: {e}")
