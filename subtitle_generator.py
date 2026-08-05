@@ -5,6 +5,7 @@ Extracts word-level timestamps from audio and generates animated ASS (Advanced S
 
 import sys
 import os
+import re
 import argparse
 from typing import List, Dict, Any
 
