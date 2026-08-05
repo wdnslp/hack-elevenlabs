@@ -128,7 +128,7 @@ def tag_story_with_gemini(title: str, body: str) -> str:
             f"Заголовок:\n{title}\n\nИстория:\n{body}"
         )
 
-        for model_name in ["models/gemini-3.5-flash", "models/gemini-3.1-flash-lite"]:
+        for model_name in ["models/gemini-3.5-flash-lite", "models/gemini-3.1-flash-lite", "models/gemini-3.5-flash"]:
             try:
                 print(f"🤖 Requesting ElevenLabs audio tags from {model_name}...")
                 resp = client.models.generate_content(

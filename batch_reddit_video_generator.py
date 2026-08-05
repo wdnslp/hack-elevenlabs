@@ -160,7 +160,7 @@ def run_infinite_batch_pipeline(
 
             # Generate Karaoke ASS Subtitles
             subtitle_ass_path = os.path.join(abs_out_dir, "subtitles", f"{story_id}_subtitles.ass")
-            generate_ass_subtitles(merged_audio_path, output_ass_path=subtitle_ass_path, model_size="tiny")
+            generate_ass_subtitles(merged_audio_path, output_ass_path=subtitle_ass_path, model_size="base")
 
             # Assemble TikTok Vertical Video
             final_mp4_path = os.path.join(abs_out_dir, "videos", f"{story_id}_tiktok.mp4")

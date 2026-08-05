@@ -24,7 +24,7 @@ PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Karaoke,Arial,68,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,2,60,60,450,1
+Style: Karaoke,Impact,76,&H00FFFFFF,&H0000E6FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,2,2,40,40,500,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -40,7 +40,7 @@ def format_timestamp(seconds: float) -> str:
         cs = 99
     return f"{hrs}:{mins:02d}:{secs:02d}.{cs:02d}"
 
-def generate_ass_subtitles(audio_path: str, output_ass_path: str = "subtitles.ass", model_size: str = "tiny") -> str:
+def generate_ass_subtitles(audio_path: str, output_ass_path: str = "subtitles.ass", model_size: str = "base") -> str:
     """Transcribe audio with faster-whisper and export karaoke ASS subtitles."""
     abs_audio = os.path.abspath(audio_path)
     abs_ass = os.path.abspath(output_ass_path)
@@ -59,7 +59,9 @@ def generate_ass_subtitles(audio_path: str, output_ass_path: str = "subtitles.as
     for segment in segments:
         if segment.words:
             for word in segment.words:
-                clean_word = word.word.strip()
+                raw_word = word.word.strip()
+                # Clean up prompt tags or bracket artifacts
+                clean_word = re.sub(r'\[.*?\]', '', raw_word).strip()
                 if clean_word:
                     words_data.append({
                         "word": clean_word,
@@ -71,15 +73,14 @@ def generate_ass_subtitles(audio_path: str, output_ass_path: str = "subtitles.as
         print("⚠️ No word timestamps extracted from audio.")
         return abs_ass
 
-    # Chunk words into groups of 2-4 words per subtitle line
+    # Chunk words into groups of 2 words per subtitle pop
     lines = []
-    chunk_size = 3
+    chunk_size = 2
     for i in range(0, len(words_data), chunk_size):
         chunk = words_data[i:i + chunk_size]
         start_time = chunk[0]["start"]
         end_time = chunk[-1]["end"]
         
-        # Build Karaoke ASS string with \kf tags (centiseconds highlight)
         ass_text_parts = []
         for w in chunk:
             duration_cs = int(round((w["end"] - w["start"]) * 100))
