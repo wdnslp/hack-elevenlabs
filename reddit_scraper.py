@@ -76,10 +76,10 @@ def fetch_via_cdp(subreddit: str = "AskReddit", limit: int = 10) -> Optional[Dic
         return None
 
 def fetch_top_stories(
-    subreddit: str = "AskReddit",
+    subreddit: str = "stories",
     time_filter: str = "day",
     limit: int = 20,
-    min_words: int = 40,
+    min_words: int = 120,
     max_words: int = 1500
 ) -> List[Dict[str, Any]]:
     """Fetch stories using PullPush live API mirror, direct HTTP, CDP fallback, or sample stories."""

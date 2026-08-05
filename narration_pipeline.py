@@ -107,8 +107,8 @@ def translate_to_russian(text: str) -> str:
         print(f"⚠️ Translation notice: {e}")
         return text
 
-def tag_story_with_gemini(title: str, body: str) -> str:
-    """Use Gemini Flash API to insert ElevenLabs v3 audio tags into Russian story text."""
+def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
+    """Use Gemini Flash API to translate English Reddit text to expressive, natural Russian and insert ElevenLabs v3 audio tags."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return ""
@@ -118,19 +118,20 @@ def tag_story_with_gemini(title: str, body: str) -> str:
         client = genai.Client(api_key=api_key)
 
         prompt = (
-            "Ты профессиональный диктор дубляжа и режиссер озвучки ElevenLabs v3.\n"
-            "Твоя задача — расставить выразительные интонационные и эмоциональные аудио-теги в квадратных скобках [tag] в русском тексте.\n"
-            "Разрешенные категории тегов ElevenLabs v3:\n"
+            "Ты профессиональный диктор дубляжа и переводчик фильмов.\n"
+            "Переведи данный англоязычный пост с Reddit на красивый, богатый, живой и естественный русский язык.\n"
+            "КРИТИЧЕСКИ ВАЖНО: Избегай дословных калек и дублирования синонимов (например, 'grateful and thankful' переводи как 'признательны и благодарны', а не 'благодарны и благодарны').\n\n"
+            "В процессе перевода расставь выразительные интонационные и эмоциональные аудио-теги в квадратных скобках [tag] для диктора ElevenLabs v3.\n"
+            "Категории тегов ElevenLabs v3:\n"
             "- Звуки человека: [sigh], [gasp], [laughs], [giggles], [snorts], [gulps], [clears throat], [yawns]\n"
             "- Эмоции и подача: [narrator], [whisper], [shouts], [sarcastic], [playfully], [flatly], [mumbles], [dramatic], [excited], [tired], [nervous], [frustrated], [sorrowful], [calm], [furious], [softly], [pauses]\n\n"
-            "НЕ меняй и НЕ вырезай слова из оригинального текста! Сохраняй все предложения истории.\n"
-            "Верни ТОЛЬКО размечанный текст с тегами. Без пояснений и без markdown оформлений.\n\n"
-            f"Заголовок:\n{title}\n\nИстория:\n{body}"
+            "Формат ответа: Верни ТОЛЬКО итоговый переведённый и размеченный текст на русском языке. Без пояснений и без markdown оформления.\n\n"
+            f"Оригинальный заголовок:\n{title}\n\nОригинальная история:\n{body}"
         )
 
         for model_name in ["models/gemini-3.5-flash-lite", "models/gemini-3.1-flash-lite", "models/gemini-3.5-flash"]:
             try:
-                print(f"🤖 Requesting ElevenLabs audio tags from {model_name}...")
+                print(f"🤖 Requesting Gemini translation & ElevenLabs audio tags from {model_name}...")
                 resp = client.models.generate_content(
                     model=model_name,
                     contents=prompt
@@ -138,26 +139,30 @@ def tag_story_with_gemini(title: str, body: str) -> str:
 
                 if resp and resp.text and len(resp.text.strip()) > 10:
                     clean_text = resp.text.strip().replace("```markdown", "").replace("```", "").strip()
-                    print(f"✨ {model_name} successfully tagged story with ElevenLabs audio tags!")
+                    print(f"✨ {model_name} successfully translated & tagged story!")
                     return clean_text
             except Exception as model_err:
                 print(f"⚠️ {model_name} notice: {model_err}")
                 continue
     except Exception as e:
-        print(f"⚠️ Gemini audio tagging notice: {e}")
+        print(f"⚠️ Gemini translation notice: {e}")
 
     return ""
 
 def format_text_with_elevenlabs_tags(title: str, body: str, translate_ru: bool = True) -> str:
-    """Format title and body into expressive ElevenLabs tagged script (via Gemini 3.5 Flash or rule fallback)."""
+    """Format title and body into expressive ElevenLabs tagged script (via Gemini AI translation or rule fallback)."""
     if translate_ru:
+        # Try Gemini AI Translation + Tagging first
+        gemini_result = tag_and_translate_story_with_gemini(title, body)
+        if gemini_result:
+            return gemini_result
+            
         title = translate_to_russian(title)
         body = translate_to_russian(body)
 
-    # Try Gemini 3.5 Flash tagger first
-    gemini_tagged = tag_story_with_gemini(title, body)
-    if gemini_tagged:
-        return gemini_tagged
+    # Rule fallback if Gemini API is unavailable
+    rule_tagged = f"[narrator] [calm] {title}\n\n[narrator] {body}"
+    return rule_tagged
 
     lines = []
     

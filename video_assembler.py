@@ -92,25 +92,17 @@ def assemble_tiktok_video(
     import random
     if len(bg_files) >= 2:
         bg1, bg2 = random.sample(bg_files, 2)
-        print(f"📹 Dual Background Compilation: [{os.path.basename(bg1)}] + [{os.path.basename(bg2)}]")
+        half_dur = round(duration / 2.0, 2)
+        rem_dur = round(duration - half_dur, 2)
         
-        # Randomly choose split mode: Left/Right (side-by-side) or Top/Bottom (stacked)
-        split_mode = random.choice(["side_by_side", "stacked"])
+        print(f"📹 Dual Background Sequential Cut: [{os.path.basename(bg1)}] ({half_dur}s) -> [{os.path.basename(bg2)}] ({rem_dur}s)")
+        print("✂️ Full Screen 9:16 (1080x1920) Video 1 for 1st half -> Video 2 for 2nd half")
         
-        if split_mode == "side_by_side":
-            print("✂️ Split Screen: Left 50% + Right 50% (540x1920 each)")
-            bg_filter = (
-                "[0:v]scale=540:1920:force_original_aspect_ratio=increase,crop=540:1920[vleft];"
-                "[1:v]scale=540:1920:force_original_aspect_ratio=increase,crop=540:1920[vright];"
-                "[vleft][vright]hstack=inputs=2[bg];"
-            )
-        else:
-            print("✂️ Split Screen: Top 50% + Bottom 50% (1080x960 each)")
-            bg_filter = (
-                "[0:v]scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[vtop];"
-                "[1:v]scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[vbottom];"
-                "[vtop][vbottom]vstack=inputs=2[bg];"
-            )
+        bg_filter = (
+            f"[0:v]trim=duration={half_dur},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setpts=PTS-STARTPTS[v1part];"
+            f"[1:v]trim=duration={rem_dur},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setpts=PTS-STARTPTS[v2part];"
+            f"[v1part][v2part]concat=n=2:v=1:a=0[bg];"
+        )
 
         card_overlay = f"[2:v]scale=900:-1[scaled_card];[bg][scaled_card]overlay=x=(W-w)/2:y=240:enable='lte(t,4.5)':eval=frame[v1]"
         if os.path.exists(abs_ass):
