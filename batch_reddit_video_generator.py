@@ -179,12 +179,16 @@ def run_infinite_batch_pipeline(
             print(f"\n📡 STORY PUBLISHED TO SERVER! Open/switch to ElevenLabs in browser.")
             print(f"👉 Tampermonkey v2.5 will auto-load Story #{story_counter} ({total_chunks} chunks) and upload audio!")
 
-            # Wait for Tampermonkey userscript to auto-send audio chunks
+            # Wait for Tampermonkey userscript to auto-send audio chunks or user skip command
             chunk_mp3_paths = wait_for_story_chunks(story_id=story_id, expected_chunks=total_chunks)
+            if not chunk_mp3_paths:
+                print(f"⏩ Story [{story_id}] skipped by user. Advancing to next story...\n")
+                continue
 
             # Merge audio chunks for this specific story_id
             merged_audio_path = os.path.join(abs_out_dir, "audio", f"{story_id}_narration.mp3")
             merge_mp3_chunks(chunk_mp3_paths, merged_audio_path)
+
 
             # Generate Karaoke ASS Subtitles
             subtitle_ass_path = os.path.join(abs_out_dir, "subtitles", f"{story_id}_subtitles.ass")

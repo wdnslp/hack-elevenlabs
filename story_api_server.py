@@ -238,10 +238,49 @@ def check_downloads_or_local_chunks(story_id: str, expected_chunks: int) -> List
 
     return []
 
-def wait_for_story_chunks(story_id: str, expected_chunks: int, poll_interval: float = 1.0) -> List[str]:
-    """Block until all expected audio chunks for story_id have been received via API or fallback pickup."""
-    print(f"⏳ Waiting for audio ({expected_chunks} chunks) for story [{story_id}]...")
+import queue
+
+_CONSOLE_INPUT_QUEUE = queue.Queue()
+_CONSOLE_THREAD_STARTED = False
+
+def _console_input_reader():
     while True:
+        try:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            cmd = line.strip().lower()
+            if cmd:
+                _CONSOLE_INPUT_QUEUE.put(cmd)
+        except Exception:
+            break
+
+def start_console_input_listener():
+    global _CONSOLE_THREAD_STARTED
+    if not _CONSOLE_THREAD_STARTED and hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+        t = threading.Thread(target=_console_input_reader, daemon=True)
+        t.start()
+        _CONSOLE_THREAD_STARTED = True
+
+class SkipStoryException(Exception):
+    pass
+
+def wait_for_story_chunks(story_id: str, expected_chunks: int, poll_interval: float = 1.0) -> List[str]:
+    """Block until all expected audio chunks for story_id have been received via API/pickup, or return [] if skipped by user."""
+    start_console_input_listener()
+    print(f"⏳ Waiting for audio ({expected_chunks} chunks) for story [{story_id}]...")
+    print(f"👉 Type 'skip' (or 's') + Enter to skip this story at any time!\n")
+
+    while True:
+        while not _CONSOLE_INPUT_QUEUE.empty():
+            try:
+                cmd = _CONSOLE_INPUT_QUEUE.get_nowait()
+                if cmd in ("skip", "s", "next"):
+                    print(f"\n⏩ 'skip' command received! Skipping story [{story_id}]...")
+                    return []
+            except queue.Empty:
+                break
+
         with CHUNKS_LOCK:
             chunks_map = RECEIVED_STORY_CHUNKS.get(story_id, {})
             if len(chunks_map) >= expected_chunks:
@@ -256,6 +295,7 @@ def wait_for_story_chunks(story_id: str, expected_chunks: int, poll_interval: fl
             return fallback_paths
 
         time.sleep(poll_interval)
+
 
 def start_story_api_server(host: str = "127.0.0.1", port: int = 5000) -> int:
     global _SERVER_INSTANCE, _SERVER_THREAD
