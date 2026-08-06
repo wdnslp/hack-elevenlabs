@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.5
+// @version      3.6
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -632,45 +633,40 @@
         }
 
         let match = searchPopoverDOM();
-        if (!match) {
-            // Instant 1-step scroll jump to Russian location (~1400px down)
-            scrollWithMouseWheel(container, 1400);
-            match = searchPopoverDOM();
-        }
-
         if (match) {
-            log('⚡ [Мгновенно] Найден элемент: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+            log('✨ Найден элемент в списке: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
             clickOptionRow(match);
             setTimeout(function () {
                 if (callback) callback(true);
-            }, 200);
+            }, 600);
             return;
         }
 
         let stepCount = 0;
-        const maxSteps = 30;
+        const maxSteps = 45;
 
         const interval = setInterval(function () {
             stepCount++;
-            scrollWithMouseWheel(container, 400);
+            scrollWithMouseWheel(container, 250);
             match = searchPopoverDOM();
 
             if (match || stepCount >= maxSteps) {
                 clearInterval(interval);
                 if (match) {
-                    log('✨ Найден вариант при авто-скролле: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+                    log('✨ Найден вариант при скролле: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
                     clickOptionRow(match);
                     setTimeout(function () {
                         if (callback) callback(true);
-                    }, 200);
+                    }, 600);
                 } else {
                     setTimeout(function () {
                         if (callback) callback(false);
-                    }, 150);
+                    }, 400);
                 }
             }
-        }, 40);
+        }, 70);
     }
+
 
 
     function selectRussianLanguage(callback) {
@@ -795,7 +791,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.5</span>',
+            '  <span>🎙️ ElevenLabs v3.6</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -829,7 +825,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.5!');
+        log('Запущен ElevenLabs Assistant v3.6!');
+
 
 
 
