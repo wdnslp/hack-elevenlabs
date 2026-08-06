@@ -231,34 +231,29 @@ def generate_ass_subtitles(
     audio_path: str,
     output_ass_path: str = "subtitles.ass",
     model_size: str = "base",
-    engine: str = "auto",
+    engine: str = "gemini",
     api_key: Optional[str] = None
 ) -> str:
-    """Generate ASS subtitles using Gemini API or faster-whisper.
-    
-    engine options:
-    - 'auto': try Gemini API first if GEMINI_API_KEY is set, fallback to whisper
-    - 'gemini': use Gemini API, fallback to whisper on error
-    - 'whisper': use faster-whisper directly
-    """
+    """Generate ASS subtitles using Gemini API (strict, no fallbacks unless engine='whisper' explicitly)."""
     abs_audio = os.path.abspath(audio_path)
     abs_ass = os.path.abspath(output_ass_path)
 
-    if engine in ("auto", "gemini"):
-        print("🤖 Attempting subtitle generation via Gemini API...")
+    if engine != "whisper":
+        print("🤖 Generating ASS subtitles via Gemini API...")
         res = generate_ass_subtitles_gemini(abs_audio, abs_ass, api_key=api_key)
         if res and os.path.exists(res):
             return res
-        print("🔄 Falling back to faster-whisper for subtitle generation...")
+        raise RuntimeError("❌ Subtitle generation via Gemini API failed!")
 
     return generate_ass_subtitles_whisper(abs_audio, abs_ass, model_size=model_size)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate ASS Karaoke Subtitles from Audio using Gemini API or faster-whisper")
     parser.add_argument("--audio", type=str, default="narration.mp3", help="Input audio file")
     parser.add_argument("--out", type=str, default="subtitles.ass", help="Output ASS subtitle file")
     parser.add_argument("--model", type=str, default="base", help="Whisper model size (tiny, base, small)")
-    parser.add_argument("--engine", type=str, default="auto", choices=["auto", "gemini", "whisper"], help="Subtitle engine (auto, gemini, whisper)")
+    parser.add_argument("--engine", type=str, default="gemini", choices=["gemini", "whisper"], help="Subtitle engine (gemini, whisper)")
     parser.add_argument("--api-key", type=str, default=None, help="Gemini API Key (optional, defaults to GEMINI_API_KEY env var)")
     args = parser.parse_args()
 

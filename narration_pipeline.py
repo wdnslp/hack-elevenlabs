@@ -175,19 +175,13 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
     return ""
 
 def format_text_with_elevenlabs_tags(title: str, body: str, translate_ru: bool = True) -> str:
-    """Format title and body into expressive ElevenLabs tagged script (via Gemini AI translation or rule fallback)."""
-    if translate_ru:
-        # Try Gemini AI Translation + Tagging first
-        gemini_result = tag_and_translate_story_with_gemini(title, body)
-        if gemini_result:
-            return gemini_result
-            
-        title = translate_to_russian(title)
-        body = translate_to_russian(body)
+    """Format title and body into expressive ElevenLabs tagged script via Gemini AI translation."""
+    gemini_result = tag_and_translate_story_with_gemini(title, body)
+    if gemini_result:
+        return gemini_result
+    
+    raise RuntimeError("❌ Gemini API translation & tagging failed! (Fallbacks are disabled)")
 
-    # Rule fallback if Gemini API is unavailable
-    rule_tagged = f"[narrator] [calm] {title}\n\n[narrator] {body}"
-    return rule_tagged
 
     lines = []
     
