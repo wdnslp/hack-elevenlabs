@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 (function () {
@@ -535,6 +536,40 @@
         } catch (e) { }
     }
 
+    function clickOptionRow(element) {
+        if (!element) return;
+        try { element.scrollIntoView({ block: 'center', inline: 'center' }); } catch (e) {}
+        try { element.focus(); } catch (e) {}
+
+        const targets = [
+            element,
+            element.parentElement,
+            element.closest('button'),
+            element.closest('li'),
+            element.closest('[role="option"]'),
+            element.closest('div[tabindex]')
+        ].filter(Boolean);
+
+        const uniqueTargets = Array.from(new Set(targets));
+
+        uniqueTargets.forEach(t => {
+            try { t.click(); } catch (e) {}
+            const rect = t.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+
+            ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(eventType => {
+                try {
+                    const evt = new PointerEvent(eventType, {
+                        bubbles: true, cancelable: true, view: window,
+                        clientX: x, clientY: y, button: 0, buttons: 1
+                    });
+                    t.dispatchEvent(evt);
+                } catch (e) {}
+            });
+        });
+    }
+
     function findAndClickOptionWithScroll(targetTexts, callback) {
         const getActivePopovers = () => {
             const selectors = '[role="listbox"], [role="menu"], [data-radix-popper-content-wrapper], [aria-modal="true"], div[class*="select"], div[class*="dropdown"], div[class*="menu"], div[style*="position: absolute"], div[style*="position: fixed"]';
@@ -551,57 +586,66 @@
         }
 
         function searchPopoverDOM() {
-            const nodes = Array.from(container.querySelectorAll('*'));
+            const nodes = Array.from(container.querySelectorAll('button, div, li, span, p, a, [role="option"]'));
             return nodes.find(el => {
-                if (el.children.length > 3) return false;
                 const txt = (el.textContent || '').trim().toLowerCase();
-                if (!txt || txt.length > 50) return false;
-                return targetTexts.some(t => {
+                if (!txt || txt.length > 80) return false;
+
+                const isMatch = targetTexts.some(t => {
                     const lowT = t.toLowerCase();
-                    return (txt === lowT || txt.startsWith(lowT + '\n') || txt.startsWith(lowT + ' ') || txt.includes(lowT)) &&
-                        el.offsetHeight > 0 && el.offsetHeight < 80;
+                    return txt === lowT ||
+                        txt.startsWith(lowT + ' ') ||
+                        txt.startsWith(lowT + '\n') ||
+                        txt.indexOf(lowT) !== -1;
                 });
+
+                if (!isMatch) return false;
+
+                // Ensure it is a leaf matching node (no children that also match target text)
+                const hasMatchingChild = Array.from(el.children).some(child => {
+                    const cTxt = (child.textContent || '').trim().toLowerCase();
+                    return targetTexts.some(t => cTxt.includes(t.toLowerCase()));
+                });
+
+                return !hasMatchingChild && el.offsetHeight > 0 && el.offsetHeight < 120;
             });
         }
 
         let match = searchPopoverDOM();
         if (match) {
-            match.scrollIntoView({ block: 'center' });
+            log('✨ Найден вариант в списке: "' + match.textContent.trim().substring(0, 30) + '"! Кликаем...', '#10b981');
+            clickOptionRow(match);
             setTimeout(function () {
-                openDropdownElement(match);
-                setTimeout(function () {
-                    if (callback) callback(true);
-                }, 800);
-            }, 200);
+                if (callback) callback(true);
+            }, 900);
             return;
         }
 
         let stepCount = 0;
-        const maxSteps = 25;
+        const maxSteps = 35;
 
         const interval = setInterval(function () {
             stepCount++;
-            scrollWithMouseWheel(container, 180);
+            scrollWithMouseWheel(container, 100);
             match = searchPopoverDOM();
 
             if (match || stepCount >= maxSteps) {
                 clearInterval(interval);
                 if (match) {
-                    match.scrollIntoView({ block: 'center' });
+                    log('✨ Найден вариант после скролла: "' + match.textContent.trim().substring(0, 30) + '"! Кликаем...', '#10b981');
+                    clickOptionRow(match);
                     setTimeout(function () {
-                        openDropdownElement(match);
-                        setTimeout(function () {
-                            if (callback) callback(true);
-                        }, 800);
-                    }, 200);
+                        if (callback) callback(true);
+                    }, 900);
                 } else {
                     setTimeout(function () {
                         if (callback) callback(false);
                     }, 500);
                 }
             }
-        }, 160);
+        }, 150);
     }
+
 
 
     function selectRussianLanguage(callback) {
@@ -730,7 +774,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.1</span>',
+            '  <span>🎙️ ElevenLabs v3.2</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -764,7 +808,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.1!');
+        log('Запущен ElevenLabs Assistant v3.2!');
+
 
 
         document.getElementById('el-btn-auto-voice').addEventListener('click', function () {
