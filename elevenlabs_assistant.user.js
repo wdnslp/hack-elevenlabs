@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.3
+// @version      3.4
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -586,6 +586,13 @@
             return;
         }
 
+        // Try using search input if available inside popover
+        const searchInput = container.querySelector('input[placeholder*="Search" i], input[type="search"]') || document.querySelector('input[placeholder*="Search" i], input[type="search"]');
+        if (searchInput && isExactWordOnly) {
+            searchInput.focus();
+            setNativeValue(searchInput, 'Den');
+        }
+
         function searchPopoverDOM() {
             const nodes = Array.from(container.querySelectorAll('button, div, li, span, p, a, [role="option"]'));
             return nodes.find(el => {
@@ -595,7 +602,6 @@
                 const isMatch = targetTexts.some(t => {
                     const lowT = t.toLowerCase();
                     if (lowT === 'den' || isExactWordOnly) {
-                        // Strict check for "Den" - IGNORE "Denis" / "Dennis"!
                         if (txt.includes('denis') || txt.includes('dennis')) return false;
                         return txt === 'den' ||
                             txt.startsWith('den ') ||
@@ -611,7 +617,6 @@
 
                 if (!isMatch) return false;
 
-                // Ensure it is a leaf matching node (no children that also match target text)
                 const hasMatchingChild = Array.from(el.children).some(child => {
                     const cTxt = (child.textContent || '').trim().toLowerCase();
                     if (targetTexts.some(t => t.toLowerCase() === 'den')) {
@@ -627,41 +632,38 @@
 
         let match = searchPopoverDOM();
         if (match) {
-            log('✨ Найден вариант в списке: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+            log('⚡ Быстро найден элемент: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
             clickOptionRow(match);
             setTimeout(function () {
                 if (callback) callback(true);
-            }, 900);
+            }, 350);
             return;
         }
 
         let stepCount = 0;
-        const maxSteps = isExactWordOnly ? 70 : 40; // Allow deep scroll for voice list
+        const maxSteps = 45;
 
         const interval = setInterval(function () {
             stepCount++;
-            scrollWithMouseWheel(container, 140);
+            scrollWithMouseWheel(container, 300);
             match = searchPopoverDOM();
 
             if (match || stepCount >= maxSteps) {
                 clearInterval(interval);
                 if (match) {
-                    log('✨ Найден вариант после скролла: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+                    log('✨ Найден вариант при быстром скролле: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
                     clickOptionRow(match);
                     setTimeout(function () {
                         if (callback) callback(true);
-                    }, 900);
+                    }, 350);
                 } else {
                     setTimeout(function () {
                         if (callback) callback(false);
-                    }, 500);
+                    }, 250);
                 }
             }
-        }, 140);
+        }, 50);
     }
-
-
-
 
     function selectRussianLanguage(callback) {
         const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
@@ -683,7 +685,7 @@
             return;
         }
 
-        log('🌐 [Шаг 1/2] Открываем меню выбора языка (текущий: "' + langPicker.textContent.trim() + '")...', '#38bdf8');
+        log('🌐 [Шаг 1/2] Быстрое открытие меню языка...', '#38bdf8');
         openDropdownElement(langPicker);
 
         setTimeout(function () {
@@ -695,9 +697,9 @@
                 }
                 setTimeout(function () {
                     if (callback) callback();
-                }, 600);
+                }, 300);
             });
-        }, 450);
+        }, 200);
     }
 
     function selectVoiceDen(callback) {
@@ -734,29 +736,23 @@
             return;
         }
 
-        log('🎙️ [Шаг 2/2] Открываем меню выбора голоса (текущий: "' + voiceTxt + '")...', '#38bdf8');
+        log('🎙️ [Шаг 2/2] Быстрое открытие меню голоса (текущий: "' + voiceTxt + '")...', '#38bdf8');
         openDropdownElement(voicePicker);
 
         setTimeout(function () {
-            const searchInput = document.querySelector('input[placeholder*="Search" i], input[type="search"]');
-            if (searchInput) {
-                setNativeValue(searchInput, 'Den');
-            }
-
-            setTimeout(function () {
-                findAndClickOptionWithScroll(['Den'], function (found) {
-                    if (found) {
-                        log('✨ Успешно выбран голос "Den"!', '#10b981');
-                    } else {
-                        log('⚠️ Голос "Den" не найден в списке.', '#f59e0b');
-                    }
-                    setTimeout(function () {
-                        if (callback) callback();
-                    }, 600);
-                }, true); // isExactWordOnly = true
-            }, 300);
-        }, 450);
+            findAndClickOptionWithScroll(['Den'], function (found) {
+                if (found) {
+                    log('✨ Успешно выбран голос "Den"!', '#10b981');
+                } else {
+                    log('⚠️ Голос "Den" не найден в списке.', '#f59e0b');
+                }
+                setTimeout(function () {
+                    if (callback) callback();
+                }, 300);
+            }, true); // isExactWordOnly = true
+        }, 200);
     }
+
 
 
     function autoSelectLanguageAndVoice() {
@@ -791,7 +787,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.3</span>',
+            '  <span>🎙️ ElevenLabs v3.4</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -825,7 +821,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.3!');
+        log('Запущен ElevenLabs Assistant v3.4!');
+
 
 
 
