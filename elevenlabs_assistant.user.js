@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.8
+// @version      3.9
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -543,8 +544,8 @@
 
     function clickOptionRow(element) {
         if (!element) return;
-        try { element.scrollIntoView({ block: 'center', inline: 'center' }); } catch (e) {}
-        try { element.focus(); } catch (e) {}
+        try { element.scrollIntoView({ block: 'center', inline: 'center' }); } catch (e) { }
+        try { element.focus(); } catch (e) { }
 
         const targets = [
             element,
@@ -558,7 +559,7 @@
         const uniqueTargets = Array.from(new Set(targets));
 
         uniqueTargets.forEach(t => {
-            try { t.click(); } catch (e) {}
+            try { t.click(); } catch (e) { }
             const rect = t.getBoundingClientRect();
             const x = rect.left + rect.width / 2;
             const y = rect.top + rect.height / 2;
@@ -570,7 +571,7 @@
                         clientX: x, clientY: y, button: 0, buttons: 1
                     });
                     t.dispatchEvent(evt);
-                } catch (e) {}
+                } catch (e) { }
             });
         });
     }
@@ -649,13 +650,13 @@
 
         const interval = setInterval(function () {
             stepCount++;
-            scrollWithMouseWheel(container, 600); // 600px step per scroll!
+            scrollWithMouseWheel(container, 500); // 500px step per scroll!
             match = searchPopoverDOM();
 
             if (match || stepCount >= maxSteps) {
                 clearInterval(interval);
                 if (match) {
-                    log('✨ Найден вариант при турбо-скролле (600px): "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+                    log('✨ Найден вариант при турбо-скролле (500px): "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
                     clickOptionRow(match);
                     setTimeout(function () {
                         if (callback) callback(true);
@@ -668,6 +669,7 @@
             }
         }, 45);
     }
+
 
 
 
@@ -795,7 +797,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.8</span>',
+            '  <span>🎙️ ElevenLabs v3.9</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -829,7 +831,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.8!');
+        log('Запущен ElevenLabs Assistant v3.9!');
+
 
 
 
