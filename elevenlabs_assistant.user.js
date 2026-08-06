@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      4.1
+// @version      4.2
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -11,6 +11,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -153,7 +154,7 @@
 
             const onUploadSuccess = function (respStr) {
                 try {
-                    setStoredLimitResets(0);
+                    setHasGeneratedOnCurrentCookie(true);
                     const resp = JSON.parse(respStr);
                     log('✅ КУСОК ' + (chunkIdx + 1) + '/' + totalChunks + ' УСПЕШНО ПЕРЕДАН В PYTHON! (' + resp.received_count + '/' + resp.total_chunks + ')', '#10b981');
                     if (resp.is_complete) {
@@ -164,6 +165,7 @@
                     }
                 } catch (e) { }
             };
+
 
 
             if (typeof GM_xmlhttpRequest === 'function') {
@@ -230,50 +232,50 @@
         }
     }
 
-    // --- 2. SMART 2-STAGE LIMIT DETECTOR WITH GM STORAGE ---
-    function getStoredLimitResets() {
+    // --- 2. SMART 2-STAGE LIMIT DETECTOR WITH GENERATION TRACKING ---
+    function getHasGeneratedOnCurrentCookie() {
         try {
-            if (typeof GM_getValue === 'function') return parseInt(GM_getValue('el_ip_resets', '0') || '0', 10);
-            return parseInt(sessionStorage.getItem('el_ip_resets') || '0', 10);
-        } catch (e) { return 0; }
+            if (typeof GM_getValue === 'function') return GM_getValue('el_has_generated', '0') === '1';
+            return sessionStorage.getItem('el_has_generated') === '1';
+        } catch (e) { return false; }
     }
 
-    function setStoredLimitResets(val) {
+    function setHasGeneratedOnCurrentCookie(val) {
         try {
-            if (typeof GM_setValue === 'function') GM_setValue('el_ip_resets', String(val));
-            sessionStorage.setItem('el_ip_resets', String(val));
+            const strVal = val ? '1' : '0';
+            if (typeof GM_setValue === 'function') GM_setValue('el_has_generated', strVal);
+            sessionStorage.setItem('el_has_generated', strVal);
         } catch (e) { }
     }
 
-    function triggerIPSwitchInVPN(resets) {
-        log('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ (Сбросов кук на этом IP: ' + resets + ')! Смените локацию в VPN!', '#ef4444');
+    function triggerIPSwitchInVPN() {
+        log('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ (0 генераций после сброса кук)! Смените локацию в VPN!', '#ef4444');
         showStatus('🚨 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН ELEVENLABS! Смените страну/IP в VPN!', '#ef4444');
-        notifyPythonServerLimitReached('IP_HARD_BLOCKED', resets);
+        notifyPythonServerLimitReached('IP_HARD_BLOCKED_ZERO_GENERATIONS', 0);
     }
 
     function handleLimitDetected(reason) {
         if (isLimitClearedRecently) return;
         isLimitClearedRecently = true;
 
-        const currentResets = getStoredLimitResets() + 1;
-        setStoredLimitResets(currentResets);
+        const hasGenerated = getHasGeneratedOnCurrentCookie();
 
-        log('🚨 ЛИМИТ ДЕТЕКТИРОВАН (' + reason + ')! [Сброс кук №' + currentResets + ' на этом IP]', '#ef4444');
-
-        if (currentResets < 4) {
+        if (hasGenerated) {
+            log('🚨 ЛИМИТ ДЕТЕКТИРОВАН (' + reason + ')! [Были успехи -> Авто-сброс куки + F5]', '#f59e0b');
+            setHasGeneratedOnCurrentCookie(false);
             clearSiteData();
             setTimeout(function () {
                 window.location.reload();
             }, 600);
         } else {
-            log('🚨 ОЧИСТКА КУКИ НЕ ПОМОГЛА (' + currentResets + ' сбросов подряд)! ТЕКУЩИЙ IP ЗАБЛОКИРОВАН!', '#ef4444');
+            log('🚨 ОЧИСТКА КУКИ НЕ ПОМОГЛА (0 генераций после сброса кук)! ТЕКУЩИЙ IP ЗАБЛОКИРОВАН!', '#ef4444');
             clearSiteData();
-            triggerIPSwitchInVPN(currentResets);
-            setStoredLimitResets(0);
+            triggerIPSwitchInVPN();
         }
 
         setTimeout(function () { isLimitClearedRecently = false; }, 4000);
     }
+
 
     function checkLimitModalOnDOM() {
         try {
@@ -847,7 +849,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v4.1</span>',
+            '  <span>🎙️ ElevenLabs v4.2</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -881,7 +883,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v4.1!');
+        log('Запущен ElevenLabs Assistant v4.2!');
+
 
 
 
