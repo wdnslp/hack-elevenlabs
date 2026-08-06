@@ -137,6 +137,23 @@ def run_ffmpeg_with_progress(ffmpeg_cmd: list, total_duration: float, abs_out: s
         print(f"❌ FFmpeg execution error: {e}")
         return False
 
+def check_nvenc_support() -> bool:
+    try:
+        res = subprocess.run(["ffmpeg", "-h", "encoder=h264_nvenc"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        return "h264_nvenc" in res.stdout
+    except Exception:
+        return False
+
+HAS_NVENC = check_nvenc_support()
+
+def get_video_encoder_args() -> list:
+    if HAS_NVENC:
+        print("⚡ Using NVIDIA NVENC Hardware Encoder (RTX 3060 GPU)...")
+        return ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20", "-pix_fmt", "yuv420p"]
+    else:
+        print("💻 Using CPU Software Encoder (libx264)...")
+        return ["-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p"]
+
 def assemble_tiktok_video(
     audio_path: str = "narration.mp3",
     card_png_path: str = "reddit_card.png",
@@ -156,6 +173,7 @@ def assemble_tiktok_video(
 
     duration = get_audio_duration(abs_audio)
     print(f"🎬 Assembling video... Audio Duration: {duration:.2f}s")
+    v_encoder = get_video_encoder_args()
 
     # Search for background videos in background_dir
     bg_files = glob.glob(os.path.join(background_dir, "*.mp4")) if os.path.exists(background_dir) else []
@@ -194,7 +212,7 @@ def assemble_tiktok_video(
             "-filter_complex", vf_filter,
             "-map", "[outv]",
             "-map", "3:a",  # Narration audio only (background video audio is muted!)
-            "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+            *v_encoder,
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-t", str(duration),
@@ -218,7 +236,7 @@ def assemble_tiktok_video(
             "-filter_complex", vf_filter,
             "-map", "[outv]",
             "-map", "2:a",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+            *v_encoder,
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-t", str(duration),
@@ -241,12 +259,13 @@ def assemble_tiktok_video(
             "-filter_complex", vf_filter,
             "-map", "[outv]",
             "-map", "2:a",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+            *v_encoder,
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-t", str(duration),
             abs_out
         ]
+
 
     run_ffmpeg_with_progress(ffmpeg_cmd, duration, abs_out)
     return abs_out
