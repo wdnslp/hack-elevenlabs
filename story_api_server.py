@@ -35,6 +35,29 @@ CURRENT_STORY_DATA: Dict[str, Any] = {
 RECEIVED_STORY_CHUNKS: Dict[str, Dict[int, str]] = {}
 CHUNKS_LOCK = threading.Lock()
 
+def rotate_vpn_ip() -> bool:
+    """Automated IP rotation using Cloudflare WARP CLI."""
+    import subprocess
+    warp_cli_path = r"C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe"
+
+    print("⚡ [AUTOROTATE] Initiating auto IP rotation via Cloudflare WARP CLI...")
+    try:
+        cmd = warp_cli_path if os.path.exists(warp_cli_path) else "warp-cli"
+        try:
+            subprocess.run([cmd, "registration", "new"], capture_output=True, timeout=10)
+        except Exception:
+            pass
+
+        subprocess.run([cmd, "disconnect"], capture_output=True, timeout=10)
+        time.sleep(1.5)
+        res = subprocess.run([cmd, "connect"], capture_output=True, timeout=10)
+        time.sleep(2.5)
+        print("✅ [AUTOROTATE] Cloudflare WARP IP successfully rotated!")
+        return True
+    except Exception as e:
+        print(f"⚠️ [AUTOROTATE WARN] Automatic WARP CLI rotation failed: {e}")
+        return False
+
 class StoryApiRequestHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -138,13 +161,16 @@ class StoryApiRequestHandler(BaseHTTPRequestHandler):
                 data = json.loads(post_data.decode("utf-8")) if post_data else {}
                 reason = data.get("reason", "unknown")
                 resets = data.get("resets", 0)
-                print(f"\n\a🚨 [SERVER ALERT] ELEVENLABS LIMIT DETECTED! Reason: {reason} (Resets on IP: {resets})")
-                print("🌐 ACTION REQUIRED: Please toggle location / switch IP in your VPN!\n")
+                print(f"\n\a🚨 [SERVER ALERT] ELEVENLABS LIMIT DETECTED! Reason: {reason}")
+                
+                # Execute automatic VPN IP rotation in background thread
+                threading.Thread(target=rotate_vpn_ip, daemon=True).start()
+
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self._send_cors_headers()
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "ok", "message": "Limit notification received"}, ensure_ascii=False).encode("utf-8"))
+                self.wfile.write(json.dumps({"status": "ok", "message": "Auto IP rotation initiated"}, ensure_ascii=False).encode("utf-8"))
             except Exception as e:
                 self.send_response(400)
                 self._send_cors_headers()
@@ -154,6 +180,7 @@ class StoryApiRequestHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self._send_cors_headers()
             self.end_headers()
+
 
 
     def log_message(self, format, *args):
