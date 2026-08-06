@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.9
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -10,7 +10,8 @@
 // @run-at       document-start
 // ==/UserScript==
 
-(function() {
+
+(function () {
     'use strict';
 
     let currentChunkIdx = 0;
@@ -62,11 +63,11 @@
             showStatus('📡 Запрос истории с локального сервера Python...', '#3b82f6');
         }
 
-        const processResponse = function(dataStr) {
+        const processResponse = function (dataStr) {
             try {
                 const data = JSON.parse(dataStr);
                 if (!data || !data.story_id) return;
-                
+
                 if (data.story_id === lastHandledStoryId && isAutoPoll) {
                     return; // No new story yet
                 }
@@ -78,15 +79,15 @@
 
                     const inputEl = document.getElementById('el-full-text-input');
                     if (inputEl) inputEl.value = textToUse.trim();
-                    
+
                     chunks = splitText(textToUse.trim());
                     currentChunkIdx = 0;
                     document.getElementById('el-chunk-controls').style.display = 'block';
-                    
+
                     const storyTitle = data.title ? (data.title.substring(0, 45) + '...') : 'История';
                     const subInfo = data.subreddit ? ('r/' + data.subreddit) : 'Reddit';
                     const batchProgress = (data.story_idx && data.total_stories) ? (' [' + data.story_idx + '/' + data.total_stories + ']') : '';
-                    
+
                     log('🎉 АВТО-ПОДТЯНУТА ИСТОРИЯ' + batchProgress + ' [' + subInfo + ']: "' + storyTitle + '" (' + chunks.length + ' кусков)!', '#10b981');
                     showStatus('✅ Подтянута история' + batchProgress + ': "' + storyTitle + '" (' + chunks.length + ' кусков)', '#10b981');
                     updateUI();
@@ -106,18 +107,18 @@
             GM_xmlhttpRequest({
                 method: "GET",
                 url: LOCAL_SERVER_STORY_URL,
-                onload: function(res) { processResponse(res.responseText); }
+                onload: function (res) { processResponse(res.responseText); }
             });
         } else {
             fetch(LOCAL_SERVER_STORY_URL)
                 .then(r => r.text())
                 .then(txt => processResponse(txt))
-                .catch(err => {});
+                .catch(err => { });
         }
     }
 
     // Auto-poll server for next story in batch every 3 seconds
-    setInterval(function() {
+    setInterval(function () {
         fetchStoryFromLocalServer(true);
     }, 3000);
 
@@ -130,7 +131,7 @@
         showStatus('🚀 Отправка куска ' + (chunkIdx + 1) + '/' + totalChunks + ' в Python...', '#a78bfa');
 
         const reader = new FileReader();
-        reader.onloadend = function() {
+        reader.onloadend = function () {
             const base64Data = reader.result.split(',')[1] || reader.result;
             const payload = JSON.stringify({
                 story_id: storyId,
@@ -139,7 +140,7 @@
                 audio_base64: base64Data
             });
 
-            const onUploadSuccess = function(respStr) {
+            const onUploadSuccess = function (respStr) {
                 try {
                     const resp = JSON.parse(respStr);
                     log('✅ КУСОК ' + (chunkIdx + 1) + '/' + totalChunks + ' УСПЕШНО ПЕРЕДАН В PYTHON! (' + resp.received_count + '/' + resp.total_chunks + ')', '#10b981');
@@ -149,7 +150,7 @@
                     } else {
                         showStatus('✅ Кусок ' + (chunkIdx + 1) + '/' + totalChunks + ' передан в Python. Жмите дальше!', '#10b981');
                     }
-                } catch(e) {}
+                } catch (e) { }
             };
 
             if (typeof GM_xmlhttpRequest === 'function') {
@@ -158,8 +159,8 @@
                     url: LOCAL_SERVER_UPLOAD_URL,
                     headers: { "Content-Type": "application/json" },
                     data: payload,
-                    onload: function(res) { onUploadSuccess(res.responseText); },
-                    onerror: function(err) {
+                    onload: function (res) { onUploadSuccess(res.responseText); },
+                    onerror: function (err) {
                         log('❌ Ошибка отправки аудио в Python (GM_XHR): ' + (err ? (err.statusText || err.responseText || JSON.stringify(err)) : 'Сбой сети'), '#ef4444');
                         showStatus('❌ Ошибка связи с Python при отправке аудио!', '#ef4444');
                     }
@@ -170,12 +171,12 @@
                     headers: { "Content-Type": "application/json" },
                     body: payload
                 })
-                .then(r => r.text())
-                .then(txt => onUploadSuccess(txt))
-                .catch(err => {
-                    log('❌ Ошибка отправки аудио в Python (Fetch): ' + err.message, '#ef4444');
-                    showStatus('❌ Ошибка связи с Python при отправке аудио!', '#ef4444');
-                });
+                    .then(r => r.text())
+                    .then(txt => onUploadSuccess(txt))
+                    .catch(err => {
+                        log('❌ Ошибка отправки аудио в Python (Fetch): ' + err.message, '#ef4444');
+                        showStatus('❌ Ошибка связи с Python при отправке аудио!', '#ef4444');
+                    });
             }
         };
         reader.readAsDataURL(blob);
@@ -186,13 +187,13 @@
         try {
             window.localStorage.clear();
             window.sessionStorage.clear();
-            document.cookie.split(";").forEach(function(c) {
+            document.cookie.split(";").forEach(function (c) {
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/;domain=" + window.location.hostname);
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
             });
             log('🧹 АВТО-ОЧИСТКА: Куки, LocalStorage и сессии ElevenLabs сброшены!', '#f59e0b');
             showStatus('🚨 Лимит! Куки очищены. Если окно появится снова — требуется смена IP в VPN.', '#ef4444');
-        } catch(e) {
+        } catch (e) {
             console.error('[Clear Site Data Error]', e);
         }
     }
@@ -219,7 +220,7 @@
             hasClearedCookiesForCurrentIP = false;
         }
 
-        setTimeout(function() { isLimitClearedRecently = false; }, 4000);
+        setTimeout(function () { isLimitClearedRecently = false; }, 4000);
     }
 
     function checkLimitModalOnDOM() {
@@ -229,10 +230,10 @@
                 bodyText.indexOf("Create a free account to continue generating") !== -1 ||
                 bodyText.indexOf("limit of generations as a logged-out user") !== -1 ||
                 bodyText.indexOf("Unusual activity detected") !== -1) {
-                
+
                 handleLimitDetected('DOM Модальное окно лимита');
             }
-        } catch(e) {}
+        } catch (e) { }
     }
 
     setInterval(checkLimitModalOnDOM, 2500);
@@ -268,7 +269,7 @@
     // --- 5. STREAMING FETCH READER & LIMIT DETECTOR ---
     function parseAndDownloadBase64Stream(text) {
         if (!text) return;
-        
+
         if (text.indexOf('quota') !== -1 || text.indexOf('rate_limit') !== -1 || text.indexOf('unusual_activity') !== -1 || text.indexOf('anonymous_limit') !== -1 || text.indexOf('reached the limit') !== -1 || text.indexOf('logged-out user') !== -1) {
             handleLimitDetected('Сетевой ответ сервера');
             return;
@@ -276,7 +277,7 @@
 
         let base64Parts = [];
         const lines = text.split('\n');
-        
+
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i].trim();
             if (!line) continue;
@@ -285,7 +286,7 @@
                 if (json.audio_base64) {
                     base64Parts.push(json.audio_base64);
                 }
-            } catch(e) {}
+            } catch (e) { }
         }
 
         if (base64Parts.length > 0) {
@@ -301,7 +302,7 @@
     }
 
     const origFetch = window.fetch;
-    window.fetch = async function() {
+    window.fetch = async function () {
         const response = await origFetch.apply(this, arguments);
         try {
             const arg0 = arguments[0];
@@ -310,7 +311,7 @@
             if (response.status === 429 || response.status === 401 || response.status === 403) {
                 handleLimitDetected('HTTP Status ' + response.status);
             }
-            
+
             if (url && (url.indexOf('text-to-speech') !== -1 || url.indexOf('/stream') !== -1 || url.indexOf('/v1/') !== -1)) {
                 log('🌐 [Fetch Interceptor] Начало потокового чтения API...', '#fbbf24');
                 isFetchStreamHandled = false;
@@ -322,7 +323,7 @@
                     let fullText = '';
 
                     function readStream() {
-                        reader.read().then(function(result) {
+                        reader.read().then(function (result) {
                             if (result.value) {
                                 fullText += decoder.decode(result.value, { stream: true });
                             }
@@ -332,24 +333,24 @@
                             } else {
                                 readStream();
                             }
-                        }).catch(function() {});
+                        }).catch(function () { });
                     }
                     readStream();
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
         return response;
     };
 
     // --- 6. MEDIASOURCE ACCUMULATOR ---
     if (window.SourceBuffer && SourceBuffer.prototype) {
         const origAppend = SourceBuffer.prototype.appendBuffer;
-        SourceBuffer.prototype.appendBuffer = function(buffer) {
+        SourceBuffer.prototype.appendBuffer = function (buffer) {
             if (buffer && buffer.byteLength > 500) {
                 mediaSourceChunks.push(buffer.slice(0));
 
                 if (mediaSourceTimer) clearTimeout(mediaSourceTimer);
-                mediaSourceTimer = setTimeout(function() {
+                mediaSourceTimer = setTimeout(function () {
                     if (mediaSourceChunks.length > 0 && !isFetchStreamHandled) {
                         log('📦 Сборка ' + mediaSourceChunks.length + ' чанков MediaSource...', '#a78bfa');
                         const combinedBlob = new Blob(mediaSourceChunks, { type: 'audio/mp3' });
@@ -403,25 +404,25 @@
 
     // --- 9. FINDERS & REACT INJECTION ---
     function findTextarea() {
-        return document.querySelector('textarea') || 
-               document.querySelector('div[contenteditable="true"]') || 
-               document.querySelector('[role="textbox"]');
+        return document.querySelector('textarea') ||
+            document.querySelector('div[contenteditable="true"]') ||
+            document.querySelector('[role="textbox"]');
     }
 
     function findPlayButton() {
-        let btn = document.querySelector("button[aria-label*='Play' i]") || 
-                  document.querySelector("button[aria-label*='Generate' i]") || 
-                  document.querySelector("button[title*='Play' i]");
+        let btn = document.querySelector("button[aria-label*='Play' i]") ||
+            document.querySelector("button[aria-label*='Generate' i]") ||
+            document.querySelector("button[title*='Play' i]");
         if (btn) return btn;
 
         const buttons = Array.from(document.querySelectorAll('button'));
-        btn = buttons.find(function(b) {
+        btn = buttons.find(function (b) {
             const txt = b.textContent.trim().toLowerCase();
             return txt === 'play' || txt === 'generate' || txt.indexOf('generate speech') !== -1 || txt.indexOf('озвучить') !== -1;
         });
         if (btn) return btn;
 
-        btn = buttons.find(function(b) { return b.querySelector('svg') && b.offsetHeight > 20 && b.offsetWidth > 20; });
+        btn = buttons.find(function (b) { return b.querySelector('svg') && b.offsetHeight > 20 && b.offsetWidth > 20; });
         return btn;
     }
 
@@ -468,7 +469,7 @@
         showStatus('📝 Вставлен кусок ' + (idx + 1) + '/' + chunks.length + ' (' + text.length + ' символов)', '#3b82f6');
 
         if (isAutoPlay) {
-            setTimeout(function() {
+            setTimeout(function () {
                 const playBtn = findPlayButton();
                 if (playBtn) {
                     playBtn.click();
@@ -484,56 +485,80 @@
     }
 
     // --- 1.1 AUTO VOICE & LANGUAGE SELECTORS ---
-    function findAndClickOptionWithScroll(targetTexts, callback) {
-        const containers = Array.from(document.querySelectorAll('[role="listbox"], [role="menu"], [data-radix-popper-content-wrapper], div[class*="select"], div[class*="dropdown"], div[class*="menu"], div[style*="position"]'));
-        let container = containers.find(c => c.offsetHeight > 50 && c.offsetWidth > 50);
+    function dispatchClickEvents(element) {
+        if (!element) return;
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(eventType => {
+            try {
+                const evt = new MouseEvent(eventType, { bubbles: true, cancelable: true, view: window });
+                element.dispatchEvent(evt);
+            } catch (e) {}
+        });
+    }
 
-        function searchCurrentDOM() {
-            const root = container || document.body;
-            const nodes = Array.from(root.querySelectorAll('div, li, button, span, p, a, [role="option"]'));
-            return nodes.find(el => {
-                const txt = el.textContent.trim().toLowerCase();
+    function findAndClickOptionWithScroll(targetTexts, callback) {
+        function searchAllDOM() {
+            const allNodes = Array.from(document.querySelectorAll('*'));
+            return allNodes.find(el => {
+                if (el.children.length > 3) return false;
+                const txt = (el.textContent || '').trim().toLowerCase();
+                if (!txt || txt.length > 50) return false;
                 return targetTexts.some(t => {
                     const lowT = t.toLowerCase();
-                    return (txt === lowT || txt.startsWith(lowT + ' ') || txt.startsWith(lowT + '\n') || txt.includes(lowT)) &&
+                    return (txt === lowT || txt.startsWith(lowT + '\n') || txt.startsWith(lowT + ' ') || txt.includes(lowT)) &&
                            el.offsetHeight > 0 && el.offsetHeight < 80;
                 });
             });
         }
 
-        let matched = searchCurrentDOM();
-        if (matched) {
-            matched.scrollIntoView({ block: 'center' });
-            setTimeout(function() {
-                matched.click();
+        let match = searchAllDOM();
+        if (match) {
+            match.scrollIntoView({ block: 'center' });
+            setTimeout(function () {
+                dispatchClickEvents(match);
                 if (callback) callback(true);
-            }, 150);
+            }, 200);
             return;
         }
 
-        const scrollTarget = container || document.querySelector('[role="listbox"]') || document.documentElement;
-        let currentScroll = 0;
-        const maxScroll = 1800;
-        const step = 150;
+        const scrollables = Array.from(document.querySelectorAll('*')).filter(el => {
+            const style = window.getComputedStyle(el);
+            const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+            return isScrollable && el.offsetHeight > 40;
+        });
 
-        const scrollInterval = setInterval(function() {
-            currentScroll += step;
-            scrollTarget.scrollTop = currentScroll;
-            matched = searchCurrentDOM();
+        if (scrollables.length === 0) {
+            scrollables.push(document.documentElement, document.body);
+        }
 
-            if (matched || currentScroll >= maxScroll) {
-                clearInterval(scrollInterval);
-                if (matched) {
-                    matched.scrollIntoView({ block: 'center' });
-                    setTimeout(function() {
-                        matched.click();
+        let scrollIdx = 0;
+        let currentPos = 0;
+
+        const interval = setInterval(function () {
+            if (scrollIdx >= scrollables.length) {
+                clearInterval(interval);
+                if (callback) callback(false);
+                return;
+            }
+
+            const targetEl = scrollables[scrollIdx];
+            currentPos += 200;
+            targetEl.scrollTop = currentPos;
+
+            match = searchAllDOM();
+            if (match || currentPos >= (targetEl.scrollHeight || 2000)) {
+                if (match) {
+                    clearInterval(interval);
+                    match.scrollIntoView({ block: 'center' });
+                    setTimeout(function () {
+                        dispatchClickEvents(match);
                         if (callback) callback(true);
-                    }, 150);
+                    }, 200);
                 } else {
-                    if (callback) callback(false);
+                    scrollIdx++;
+                    currentPos = 0;
                 }
             }
-        }, 120);
+        }, 130);
     }
 
     function selectRussianLanguage(callback) {
@@ -557,16 +582,16 @@
         }
 
         log('🌐 [Шаг 1/2] Открываем меню выбора языка (текущий: "' + langPicker.textContent.trim() + '")...', '#38bdf8');
-        langPicker.click();
+        dispatchClickEvents(langPicker);
 
-        setTimeout(function() {
-            findAndClickOptionWithScroll(['Russian', 'Русский'], function(found) {
+        setTimeout(function () {
+            findAndClickOptionWithScroll(['Russian', 'Русский'], function (found) {
                 if (found) {
                     log('✨ Успешно выбран язык "Русский"!', '#10b981');
                 } else {
                     log('⚠️ Элемент языка "Русский" не найден в списке (даже после прокрутки вниз).', '#f59e0b');
                 }
-                setTimeout(function() {
+                setTimeout(function () {
                     if (callback) callback();
                 }, 600);
             });
@@ -579,12 +604,12 @@
             const txt = (b.textContent || '').trim();
             const aria = (b.getAttribute('aria-label') || '').toLowerCase();
             return (aria.includes('voice') || b.querySelector('svg')) &&
-                   !txt.toLowerCase().includes('english') &&
-                   !txt.toLowerCase().includes('russian') &&
-                   !txt.toLowerCase().includes('русский') &&
-                   !txt.toLowerCase().includes('play') &&
-                   !txt.toLowerCase().includes('generate') &&
-                   (b.offsetWidth > 40 && b.offsetHeight > 20);
+                !txt.toLowerCase().includes('english') &&
+                !txt.toLowerCase().includes('russian') &&
+                !txt.toLowerCase().includes('русский') &&
+                !txt.toLowerCase().includes('play') &&
+                !txt.toLowerCase().includes('generate') &&
+                (b.offsetWidth > 40 && b.offsetHeight > 20);
         });
 
         if (!voicePicker) {
@@ -607,22 +632,22 @@
         }
 
         log('🎙️ [Шаг 2/2] Открываем меню выбора голоса (текущий: "' + voicePicker.textContent.trim() + '")...', '#38bdf8');
-        voicePicker.click();
+        dispatchClickEvents(voicePicker);
 
-        setTimeout(function() {
+        setTimeout(function () {
             const searchInput = document.querySelector('input[placeholder*="Search" i], input[type="search"]');
             if (searchInput) {
                 setNativeValue(searchInput, 'Den');
             }
 
-            setTimeout(function() {
-                findAndClickOptionWithScroll(['Den'], function(found) {
+            setTimeout(function () {
+                findAndClickOptionWithScroll(['Den'], function (found) {
                     if (found) {
                         log('✨ Успешно выбран голос "Den"!', '#10b981');
                     } else {
                         log('⚠️ Голос "Den" не найден в списке (даже после прокрутки).', '#f59e0b');
                     }
-                    setTimeout(function() {
+                    setTimeout(function () {
                         if (callback) callback();
                     }, 600);
                 });
@@ -632,12 +657,13 @@
 
     function autoSelectLanguageAndVoice() {
         log('⚙️ Последовательная настройка: 1) Русский язык -> 2) Голос Den...', '#a78bfa');
-        selectRussianLanguage(function() {
-            selectVoiceDen(function() {
+        selectRussianLanguage(function () {
+            selectVoiceDen(function () {
                 log('✅ Настройка языка и голоса завершена!', '#10b981');
             });
         });
     }
+
 
 
 
@@ -700,19 +726,19 @@
         document.body.appendChild(panel);
         log('Запущен ElevenLabs Assistant v2.7!');
 
-        document.getElementById('el-btn-auto-voice').addEventListener('click', function() {
+        document.getElementById('el-btn-auto-voice').addEventListener('click', function () {
             autoSelectLanguageAndVoice();
         });
 
-        document.getElementById('el-btn-clean-data').addEventListener('click', function() {
+        document.getElementById('el-btn-clean-data').addEventListener('click', function () {
             clearSiteData();
         });
 
-        document.getElementById('el-btn-fetch-server').addEventListener('click', function() {
+        document.getElementById('el-btn-fetch-server').addEventListener('click', function () {
             fetchStoryFromLocalServer(false);
         });
 
-        document.getElementById('el-btn-process').addEventListener('click', function() {
+        document.getElementById('el-btn-process').addEventListener('click', function () {
             const raw = document.getElementById('el-full-text-input').value.trim();
             if (!raw) {
                 alert('Вставьте текст сказки или подтяните с сервера!');
@@ -726,26 +752,26 @@
             updateUI();
         });
 
-        document.getElementById('el-btn-play').addEventListener('click', function() { injectAndPlayChunk(currentChunkIdx); });
-        document.getElementById('el-btn-download-now').addEventListener('click', function() { forceDownloadCurrentAudio(); });
-        document.getElementById('el-btn-next').addEventListener('click', function() {
+        document.getElementById('el-btn-play').addEventListener('click', function () { injectAndPlayChunk(currentChunkIdx); });
+        document.getElementById('el-btn-download-now').addEventListener('click', function () { forceDownloadCurrentAudio(); });
+        document.getElementById('el-btn-next').addEventListener('click', function () {
             if (currentChunkIdx < chunks.length - 1) {
                 currentChunkIdx++;
                 injectAndPlayChunk(currentChunkIdx);
             }
         });
-        document.getElementById('el-btn-prev').addEventListener('click', function() {
+        document.getElementById('el-btn-prev').addEventListener('click', function () {
             if (currentChunkIdx > 0) {
                 currentChunkIdx--;
                 injectAndPlayChunk(currentChunkIdx);
             }
         });
-        document.getElementById('el-auto-play').addEventListener('change', function(e) {
+        document.getElementById('el-auto-play').addEventListener('change', function (e) {
             isAutoPlay = e.target.checked;
         });
 
-        setTimeout(function() { fetchStoryFromLocalServer(false); }, 1000);
-        setTimeout(function() { autoSelectLanguageAndVoice(); }, 1800);
+        setTimeout(function () { fetchStoryFromLocalServer(false); }, 1000);
+        setTimeout(function () { autoSelectLanguageAndVoice(); }, 1800);
     }
 
 
@@ -764,7 +790,7 @@
     }
 
     if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', function() { setTimeout(createWidget, 600); });
+        window.addEventListener('DOMContentLoaded', function () { setTimeout(createWidget, 600); });
     } else {
         setTimeout(createWidget, 600);
     }
