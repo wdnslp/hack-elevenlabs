@@ -62,6 +62,81 @@ def get_audio_duration(audio_path: str) -> float:
 
     return 30.0
 
+def run_ffmpeg_with_progress(ffmpeg_cmd: list, total_duration: float, abs_out: str) -> bool:
+    """Run FFmpeg command with real-time animated progress bar."""
+    progress_cmd = ffmpeg_cmd.copy()
+    progress_cmd.insert(1, "-progress")
+    progress_cmd.insert(2, "pipe:1")
+    progress_cmd.insert(3, "-nostats")
+
+    try:
+        process = subprocess.Popen(
+            progress_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+    except Exception as e:
+        print(f"❌ Failed to launch FFmpeg: {e}")
+        return False
+
+    current_sec = 0.0
+    speed_str = "1.0x"
+    bar_length = 30
+
+    print("⚡ Starting Video Rendering...")
+
+    try:
+        while True:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+            
+            line = line.strip()
+            if line.startswith("out_time_us="):
+                try:
+                    val_us = float(line.split("=", 1)[1])
+                    current_sec = val_us / 1_000_000.0
+                except ValueError:
+                    pass
+            elif line.startswith("out_time="):
+                try:
+                    time_str = line.split("=", 1)[1]
+                    parts = time_str.split(":")
+                    if len(parts) == 3:
+                        h, m, s = float(parts[0]), float(parts[1]), float(parts[2])
+                        current_sec = h * 3600 + m * 60 + s
+                except ValueError:
+                    pass
+            elif line.startswith("speed="):
+                speed_str = line.split("=", 1)[1].strip()
+
+            if line.startswith("progress="):
+                pct = min(100.0, (current_sec / total_duration) * 100.0) if total_duration > 0 else 0.0
+                filled_len = int(round(bar_length * pct / 100.0))
+                bar = "█" * filled_len + "░" * (bar_length - filled_len)
+                sys.stdout.write(f"\r⚡ Rendering Progress: [{bar}] {pct:5.1f}% ({current_sec:.1f}s / {total_duration:.1f}s) | Speed: {speed_str} ")
+                sys.stdout.flush()
+
+        process.wait()
+        stderr_output = process.stderr.read()
+
+        if process.returncode == 0 and os.path.exists(abs_out):
+            bar = "█" * bar_length
+            sys.stdout.write(f"\r✨ Rendering Progress: [{bar}] 100.0% ({total_duration:.1f}s / {total_duration:.1f}s) | 100% DONE!\n")
+            sys.stdout.flush()
+            print(f"🎉 VIDEO READY TO LAUNCH / WATCH! -> {abs_out}")
+            return True
+        else:
+            sys.stdout.write("\n")
+            print(f"❌ FFmpeg rendering failed: {stderr_output}")
+            return False
+    except Exception as e:
+        sys.stdout.write("\n")
+        print(f"❌ FFmpeg execution error: {e}")
+        return False
+
 def assemble_tiktok_video(
     audio_path: str = "narration.mp3",
     card_png_path: str = "reddit_card.png",
@@ -173,16 +248,10 @@ def assemble_tiktok_video(
             abs_out
         ]
 
-    try:
-        res = subprocess.run(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if res.returncode == 0 and os.path.exists(abs_out):
-            print(f"🎉 FINAL TIKTOK VIDEO CREATED SUCCESSFULLY -> {abs_out}")
-        else:
-            print(f"❌ FFmpeg rendering failed: {res.stderr}")
-    except Exception as e:
-        print(f"❌ FFmpeg error: {e}")
-
+    run_ffmpeg_with_progress(ffmpeg_cmd, duration, abs_out)
     return abs_out
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Assemble vertical TikTok video from elements")
