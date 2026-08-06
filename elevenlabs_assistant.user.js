@@ -483,6 +483,98 @@
         updateUI();
     }
 
+    // --- 1.1 AUTO VOICE & LANGUAGE SELECTORS ---
+    function selectVoiceDen() {
+        const buttons = Array.from(document.querySelectorAll('button, div[role="button"], [data-testid*="voice"]'));
+        let voicePicker = buttons.find(b => {
+            const txt = (b.textContent || '').toLowerCase();
+            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+            return aria.includes('voice') || aria.includes('select voice') || b.querySelector('[data-testid*="voice"]') || (txt.includes('voice') && !txt.includes('settings'));
+        });
+
+        if (!voicePicker) {
+            voicePicker = document.querySelector('button[id*="voice"], [aria-haspopup="listbox"]');
+        }
+
+        if (voicePicker) {
+            const currentVoiceTxt = voicePicker.textContent.trim();
+            if (currentVoiceTxt.includes('Den')) {
+                log('✅ Голос "Den" уже выбран.', '#10b981');
+                return true;
+            }
+            log('🎙️ Открываем меню выбора голоса (текущий: "' + currentVoiceTxt + '")...', '#38bdf8');
+            voicePicker.click();
+
+            setTimeout(function() {
+                const searchInput = document.querySelector('input[placeholder*="Search" i], input[type="search"]');
+                if (searchInput) {
+                    setNativeValue(searchInput, 'Den');
+                }
+
+                setTimeout(function() {
+                    const options = Array.from(document.querySelectorAll('li, div[role="option"], button, span, p, div'));
+                    const denOpt = options.find(el => {
+                        const txt = el.textContent.trim();
+                        return (txt === 'Den' || txt.startsWith('Den ') || txt.includes('Den (')) && el.offsetHeight > 0;
+                    });
+                    if (denOpt) {
+                        denOpt.click();
+                        log('✨ Выбран голос "Den"!', '#10b981');
+                    } else {
+                        log('⚠️ Вариант голоса "Den" не найден в списке.', '#f59e0b');
+                    }
+                }, 300);
+            }, 300);
+            return true;
+        } else {
+            log('⚠️ Выпадающее меню выбора голоса не найдено на странице.', '#f59e0b');
+            return false;
+        }
+    }
+
+    function selectRussianLanguage() {
+        const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
+        let langPicker = btns.find(b => {
+            const txt = (b.textContent || '').toLowerCase();
+            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+            return aria.includes('language') || aria.includes('model') || txt.includes('english') || txt.includes('russian') || txt.includes('русский') || txt.includes('multilingual');
+        });
+
+        if (langPicker) {
+            const currentLangTxt = langPicker.textContent.trim();
+            if (currentLangTxt.includes('Russian') || currentLangTxt.includes('Русский')) {
+                log('✅ Язык "Русский" уже выбран.', '#10b981');
+                return true;
+            }
+            log('🌐 Открываем меню выбора языка (текущий: "' + currentLangTxt + '")...', '#38bdf8');
+            langPicker.click();
+
+            setTimeout(function() {
+                const options = Array.from(document.querySelectorAll('li, div[role="option"], button, span, p, div'));
+                const ruOpt = options.find(el => {
+                    const txt = el.textContent.trim().toLowerCase();
+                    return (txt === 'russian' || txt === 'русский' || txt.includes('russian')) && el.offsetHeight > 0;
+                });
+                if (ruOpt) {
+                    ruOpt.click();
+                    log('✨ Выбран язык "Русский"!', '#10b981');
+                } else {
+                    log('⚠️ Язык "Русский" не найден в списке.', '#f59e0b');
+                }
+            }, 300);
+            return true;
+        } else {
+            log('⚠️ Выпадающее меню выбора языка не найдено на странице.', '#f59e0b');
+            return false;
+        }
+    }
+
+    function autoSelectLanguageAndVoice() {
+        log('⚙️ Запуск авто-настройки голоса "Den" и русского языка...', '#a78bfa');
+        selectVoiceDen();
+        setTimeout(selectRussianLanguage, 900);
+    }
+
     // --- 10. FLOATING UI WIDGET ---
     function createWidget() {
         if (document.getElementById('el-assistant-widget')) return;
@@ -506,8 +598,11 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs Assistant v2.6</span>',
-            '  <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
+            '  <span>🎙️ ElevenLabs v2.7</span>',
+            '  <div style="display: flex; gap: 4px;">',
+            '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
+            '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
+            '  </div>',
             '</div>',
             '<div>',
             '  <button id="el-btn-fetch-server" class="el-btn el-btn-sky">📡 Подтянуть историю с сервера (127.0.0.1:5000)</button>',
@@ -537,7 +632,11 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v2.6 (Автоматический пакетный режим)!');
+        log('Запущен ElevenLabs Assistant v2.7!');
+
+        document.getElementById('el-btn-auto-voice').addEventListener('click', function() {
+            autoSelectLanguageAndVoice();
+        });
 
         document.getElementById('el-btn-clean-data').addEventListener('click', function() {
             clearSiteData();
@@ -580,7 +679,9 @@
         });
 
         setTimeout(function() { fetchStoryFromLocalServer(false); }, 1000);
+        setTimeout(function() { autoSelectLanguageAndVoice(); }, 1800);
     }
+
 
     function updateUI() {
         const info = document.getElementById('el-chunk-info');
