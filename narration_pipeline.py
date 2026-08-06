@@ -107,11 +107,19 @@ def translate_to_russian(text: str) -> str:
         print(f"⚠️ Translation notice: {e}")
         return text
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
     """Use Gemini Flash API to translate English Reddit text to expressive, natural Russian and insert ElevenLabs v3 audio tags."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
+        print("⚠️ GEMINI_API_KEY is missing in environment! Gemini translation & tagging skipped, using Google Translate fallback.")
         return ""
+
 
     try:
         from google import genai
