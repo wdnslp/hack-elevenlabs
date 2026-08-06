@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      4.2
+// @version      4.3
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -11,6 +11,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -249,10 +250,14 @@
     }
 
     function triggerIPSwitchInVPN() {
-        log('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ (0 генераций после сброса кук)! Смените локацию в VPN!', '#ef4444');
-        showStatus('🚨 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН ELEVENLABS! Смените страну/IP в VPN!', '#ef4444');
+        log('⚡ [АВТО-РОТАЦИЯ] IP заблокирован. Сигнал в Python: автоматическая смена IP через Cloudflare WARP...', '#a78bfa');
+        showStatus('⚡ Авто-смена IP через Cloudflare WARP... Страница перезагрузится через 3 сек', '#a78bfa');
         notifyPythonServerLimitReached('IP_HARD_BLOCKED_ZERO_GENERATIONS', 0);
+        setTimeout(function () {
+            window.location.reload();
+        }, 3500);
     }
+
 
     function handleLimitDetected(reason) {
         if (isLimitClearedRecently) return;
@@ -849,7 +854,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v4.2</span>',
+            '  <span>🎙️ ElevenLabs v4.3</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -883,7 +888,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v4.2!');
+        log('Запущен ElevenLabs Assistant v4.3!');
+
 
 
 
