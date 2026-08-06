@@ -275,8 +275,8 @@ def generate_ass_subtitles_gemini(audio_path: str, output_ass_path: str = "subti
         return None
 
 
-def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subtitles.ass", model_size: str = "base") -> str:
-    """Transcribe audio with faster-whisper and export karaoke ASS subtitles."""
+def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subtitles.ass", model_size: str = "large-v3", device: str = "auto") -> str:
+    """Transcribe audio with faster-whisper (large-v3 model on CUDA GPU) and export karaoke ASS subtitles."""
     abs_audio = os.path.abspath(audio_path)
     abs_ass = os.path.abspath(output_ass_path)
     
@@ -284,10 +284,20 @@ def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subt
         print(f"❌ Audio file not found: {abs_audio}")
         return abs_ass
 
-    print(f"🎙️ Transcribing {abs_audio} with faster-whisper ({model_size} model)...")
     from faster_whisper import WhisperModel
     
-    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    model = None
+    if device in ("cuda", "auto"):
+        try:
+            print(f"🎙️ Transcribing {os.path.basename(abs_audio)} with faster-whisper ({model_size} on CUDA GPU)...")
+            model = WhisperModel(model_size, device="cuda", compute_type="float16")
+        except Exception as cuda_err:
+            print(f"⚠️ CUDA Whisper init notice ({cuda_err}), falling back to CPU...")
+
+    if model is None:
+        print(f"🎙️ Transcribing {os.path.basename(abs_audio)} with faster-whisper ({model_size} on CPU)...")
+        model = WhisperModel(model_size, device="cpu", compute_type="int8")
+
     segments, info = model.transcribe(abs_audio, word_timestamps=True, language="ru")
 
     words_data = []
@@ -308,7 +318,7 @@ def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subt
 def generate_ass_subtitles(
     audio_path: str,
     output_ass_path: str = "subtitles.ass",
-    model_size: str = "base",
+    model_size: str = "large-v3",
     engine: str = "whisper",
     api_key: Optional[str] = None
 ) -> str:
@@ -330,10 +340,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate ASS Karaoke Subtitles from Audio using faster-whisper or Gemini API")
     parser.add_argument("--audio", type=str, default="narration.mp3", help="Input audio file")
     parser.add_argument("--out", type=str, default="subtitles.ass", help="Output ASS subtitle file")
-    parser.add_argument("--model", type=str, default="base", help="Whisper model size (tiny, base, small)")
+    parser.add_argument("--model", type=str, default="large-v3", help="Whisper model size (large-v3, medium, small, base)")
     parser.add_argument("--engine", type=str, default="whisper", choices=["whisper", "gemini"], help="Subtitle engine (whisper, gemini)")
     parser.add_argument("--api-key", type=str, default=None, help="Gemini API Key (optional, defaults to GEMINI_API_KEY env var)")
     args = parser.parse_args()
 
     generate_ass_subtitles(args.audio, output_ass_path=args.out, model_size=args.model, engine=args.engine, api_key=args.api_key)
+
 
