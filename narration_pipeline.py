@@ -150,10 +150,7 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
 
         for model_name in [
             "models/gemini-3.5-flash-lite",
-            "models/gemini-3.1-flash-lite",
-            "models/gemini-2.5-flash-lite",
-            "models/gemini-3.5-flash",
-            "models/gemini-2.5-flash"
+            "models/gemini-3.1-flash-lite"
         ]:
             try:
                 print(f"🤖 Requesting Gemini translation & ElevenLabs audio tags from {model_name}...")

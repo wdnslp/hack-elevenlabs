@@ -129,11 +129,8 @@ def generate_ass_subtitles_gemini(audio_path: str, output_ass_path: str = "subti
 
         models_to_try = [
             "models/gemini-3.5-flash-lite",
-            "models/gemini-2.5-flash-lite",
-            "models/gemini-3.5-flash",
-            "models/gemini-2.5-flash"
+            "models/gemini-3.1-flash-lite"
         ]
-
 
         words_data = []
         try:
@@ -158,7 +155,18 @@ def generate_ass_subtitles_gemini(audio_path: str, output_ass_path: str = "subti
                                 lines = lines[:-1]
                             raw_json = "\n".join(lines).strip()
 
-                        parsed = json.loads(raw_json)
+                        parsed = None
+                        try:
+                            parsed = json.loads(raw_json)
+                        except Exception as json_err:
+                            print(f"⚠️ Direct JSON parsing notice ({json_err}), recovering via regex...")
+                            matches = re.findall(
+                                r'\{\s*"word"\s*:\s*"([^"]+)"\s*,\s*"start"\s*:\s*([\d.]+)\s*,\s*"end"\s*:\s*([\d.]+)\s*\}',
+                                raw_json
+                            )
+                            if matches:
+                                parsed = [{"word": m[0], "start": float(m[1]), "end": float(m[2])} for m in matches]
+
                         if isinstance(parsed, dict):
                             for k in ["words", "subtitles", "transcript", "items", "segments"]:
                                 if k in parsed and isinstance(parsed[k], list):
@@ -181,6 +189,7 @@ def generate_ass_subtitles_gemini(audio_path: str, output_ass_path: str = "subti
                 except Exception as model_err:
                     print(f"⚠️ Gemini model {model_name} failed: {model_err}")
                     continue
+
         finally:
             try:
                 client.files.delete(name=uploaded_file.name)
