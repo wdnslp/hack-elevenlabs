@@ -484,6 +484,95 @@
     }
 
     // --- 1.1 AUTO VOICE & LANGUAGE SELECTORS ---
+    function findAndClickOptionWithScroll(targetTexts, callback) {
+        const containers = Array.from(document.querySelectorAll('[role="listbox"], [role="menu"], [data-radix-popper-content-wrapper], div[class*="select"], div[class*="dropdown"], div[class*="menu"], div[style*="position"]'));
+        let container = containers.find(c => c.offsetHeight > 50 && c.offsetWidth > 50);
+
+        function searchCurrentDOM() {
+            const root = container || document.body;
+            const nodes = Array.from(root.querySelectorAll('div, li, button, span, p, a, [role="option"]'));
+            return nodes.find(el => {
+                const txt = el.textContent.trim().toLowerCase();
+                return targetTexts.some(t => {
+                    const lowT = t.toLowerCase();
+                    return (txt === lowT || txt.startsWith(lowT + ' ') || txt.startsWith(lowT + '\n') || txt.includes(lowT)) &&
+                           el.offsetHeight > 0 && el.offsetHeight < 80;
+                });
+            });
+        }
+
+        let matched = searchCurrentDOM();
+        if (matched) {
+            matched.scrollIntoView({ block: 'center' });
+            setTimeout(function() {
+                matched.click();
+                if (callback) callback(true);
+            }, 150);
+            return;
+        }
+
+        const scrollTarget = container || document.querySelector('[role="listbox"]') || document.documentElement;
+        let currentScroll = 0;
+        const maxScroll = 1800;
+        const step = 150;
+
+        const scrollInterval = setInterval(function() {
+            currentScroll += step;
+            scrollTarget.scrollTop = currentScroll;
+            matched = searchCurrentDOM();
+
+            if (matched || currentScroll >= maxScroll) {
+                clearInterval(scrollInterval);
+                if (matched) {
+                    matched.scrollIntoView({ block: 'center' });
+                    setTimeout(function() {
+                        matched.click();
+                        if (callback) callback(true);
+                    }, 150);
+                } else {
+                    if (callback) callback(false);
+                }
+            }
+        }, 120);
+    }
+
+    function selectRussianLanguage(callback) {
+        const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
+        let langPicker = buttons.find(b => {
+            const txt = (b.textContent || '').trim().toLowerCase();
+            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+            return txt.includes('english') || txt.includes('russian') || txt.includes('русский') || aria.includes('language');
+        });
+
+        if (!langPicker) {
+            log('⚠️ Выпадающее меню выбора языка не найдено на странице.', '#f59e0b');
+            if (callback) callback();
+            return;
+        }
+
+        if (langPicker.textContent.includes('Russian') || langPicker.textContent.includes('Русский')) {
+            log('✅ Язык "Русский" уже выбран.', '#10b981');
+            if (callback) callback();
+            return;
+        }
+
+        log('🌐 [Шаг 1/2] Открываем меню выбора языка (текущий: "' + langPicker.textContent.trim() + '")...', '#38bdf8');
+        langPicker.click();
+
+        setTimeout(function() {
+            findAndClickOptionWithScroll(['Russian', 'Русский'], function(found) {
+                if (found) {
+                    log('✨ Успешно выбран язык "Русский"!', '#10b981');
+                } else {
+                    log('⚠️ Элемент языка "Русский" не найден в списке (даже после прокрутки вниз).', '#f59e0b');
+                }
+                setTimeout(function() {
+                    if (callback) callback();
+                }, 600);
+            });
+        }, 400);
+    }
+
     function selectVoiceDen(callback) {
         const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
         let voicePicker = buttons.find(b => {
@@ -492,6 +581,7 @@
             return (aria.includes('voice') || b.querySelector('svg')) &&
                    !txt.toLowerCase().includes('english') &&
                    !txt.toLowerCase().includes('russian') &&
+                   !txt.toLowerCase().includes('русский') &&
                    !txt.toLowerCase().includes('play') &&
                    !txt.toLowerCase().includes('generate') &&
                    (b.offsetWidth > 40 && b.offsetHeight > 20);
@@ -516,7 +606,7 @@
             return;
         }
 
-        log('🎙️ [Шаг 1/2] Открываем выбор голоса...', '#38bdf8');
+        log('🎙️ [Шаг 2/2] Открываем меню выбора голоса (текущий: "' + voicePicker.textContent.trim() + '")...', '#38bdf8');
         voicePicker.click();
 
         setTimeout(function() {
@@ -526,79 +616,29 @@
             }
 
             setTimeout(function() {
-                const allNodes = Array.from(document.querySelectorAll('div, li, button, span, p'));
-                const denItem = allNodes.find(el => {
-                    const txt = el.textContent.trim();
-                    return (txt === 'Den' || txt.startsWith('Den ') || txt.startsWith('Den\n')) &&
-                           el.offsetHeight > 0 && el.offsetHeight < 80;
+                findAndClickOptionWithScroll(['Den'], function(found) {
+                    if (found) {
+                        log('✨ Успешно выбран голос "Den"!', '#10b981');
+                    } else {
+                        log('⚠️ Голос "Den" не найден в списке (даже после прокрутки).', '#f59e0b');
+                    }
+                    setTimeout(function() {
+                        if (callback) callback();
+                    }, 600);
                 });
-
-                if (denItem) {
-                    denItem.click();
-                    log('✨ Выбран голос "Den"!', '#10b981');
-                } else {
-                    log('⚠️ Голос "Den" не найден в открывшемся списке.', '#f59e0b');
-                }
-
-                setTimeout(function() {
-                    if (callback) callback();
-                }, 600);
             }, 300);
-        }, 500);
-    }
-
-    function selectRussianLanguage(callback) {
-        const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
-        let langPicker = buttons.find(b => {
-            const txt = (b.textContent || '').trim().toLowerCase();
-            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
-            return txt.includes('english') || txt.includes('russian') || txt.includes('русский') || aria.includes('language');
-        });
-
-        if (!langPicker) {
-            log('⚠️ Выпадающее меню выбора языка не найдено.', '#f59e0b');
-            if (callback) callback();
-            return;
-        }
-
-        if (langPicker.textContent.includes('Russian') || langPicker.textContent.includes('Русский')) {
-            log('✅ Язык "Русский" уже выбран.', '#10b981');
-            if (callback) callback();
-            return;
-        }
-
-        log('🌐 [Шаг 2/2] Открываем выбор языка...', '#38bdf8');
-        langPicker.click();
-
-        setTimeout(function() {
-            const allNodes = Array.from(document.querySelectorAll('div, li, button, span, p'));
-            const ruItem = allNodes.find(el => {
-                const txt = el.textContent.trim().toLowerCase();
-                return (txt === 'russian' || txt === 'русский') && el.offsetHeight > 0 && el.offsetHeight < 70;
-            });
-
-            if (ruItem) {
-                ruItem.scrollIntoView({ block: 'center' });
-                ruItem.click();
-                log('✨ Выбран язык "Русский"!', '#10b981');
-            } else {
-                log('⚠️ Элемент языка "Русский" не найден в списке.', '#f59e0b');
-            }
-
-            setTimeout(function() {
-                if (callback) callback();
-            }, 500);
-        }, 500);
+        }, 400);
     }
 
     function autoSelectLanguageAndVoice() {
-        log('⚙️ Последовательная настройка: 1) Голос Den -> 2) Русский язык...', '#a78bfa');
-        selectVoiceDen(function() {
-            selectRussianLanguage(function() {
-                log('✅ Выбор голоса и языка завершен!', '#10b981');
+        log('⚙️ Последовательная настройка: 1) Русский язык -> 2) Голос Den...', '#a78bfa');
+        selectRussianLanguage(function() {
+            selectVoiceDen(function() {
+                log('✅ Настройка языка и голоса завершена!', '#10b981');
             });
         });
     }
+
 
 
     // --- 10. FLOATING UI WIDGET ---
