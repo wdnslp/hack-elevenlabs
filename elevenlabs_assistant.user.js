@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.2
+// @version      3.3
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -570,7 +571,7 @@
         });
     }
 
-    function findAndClickOptionWithScroll(targetTexts, callback) {
+    function findAndClickOptionWithScroll(targetTexts, callback, isExactWordOnly) {
         const getActivePopovers = () => {
             const selectors = '[role="listbox"], [role="menu"], [data-radix-popper-content-wrapper], [aria-modal="true"], div[class*="select"], div[class*="dropdown"], div[class*="menu"], div[style*="position: absolute"], div[style*="position: fixed"]';
             return Array.from(document.querySelectorAll(selectors)).filter(c => c.offsetHeight > 50 && c.offsetWidth > 50);
@@ -593,6 +594,15 @@
 
                 const isMatch = targetTexts.some(t => {
                     const lowT = t.toLowerCase();
+                    if (lowT === 'den' || isExactWordOnly) {
+                        // Strict check for "Den" - IGNORE "Denis" / "Dennis"!
+                        if (txt.includes('denis') || txt.includes('dennis')) return false;
+                        return txt === 'den' ||
+                            txt.startsWith('den ') ||
+                            txt.startsWith('den\n') ||
+                            txt.startsWith('den (') ||
+                            txt.startsWith('den-');
+                    }
                     return txt === lowT ||
                         txt.startsWith(lowT + ' ') ||
                         txt.startsWith(lowT + '\n') ||
@@ -604,6 +614,10 @@
                 // Ensure it is a leaf matching node (no children that also match target text)
                 const hasMatchingChild = Array.from(el.children).some(child => {
                     const cTxt = (child.textContent || '').trim().toLowerCase();
+                    if (targetTexts.some(t => t.toLowerCase() === 'den')) {
+                        if (cTxt.includes('denis') || cTxt.includes('dennis')) return false;
+                        return cTxt === 'den' || cTxt.startsWith('den ') || cTxt.startsWith('den\n') || cTxt.startsWith('den (');
+                    }
                     return targetTexts.some(t => cTxt.includes(t.toLowerCase()));
                 });
 
@@ -613,7 +627,7 @@
 
         let match = searchPopoverDOM();
         if (match) {
-            log('✨ Найден вариант в списке: "' + match.textContent.trim().substring(0, 30) + '"! Кликаем...', '#10b981');
+            log('✨ Найден вариант в списке: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
             clickOptionRow(match);
             setTimeout(function () {
                 if (callback) callback(true);
@@ -622,17 +636,17 @@
         }
 
         let stepCount = 0;
-        const maxSteps = 35;
+        const maxSteps = isExactWordOnly ? 70 : 40; // Allow deep scroll for voice list
 
         const interval = setInterval(function () {
             stepCount++;
-            scrollWithMouseWheel(container, 100);
+            scrollWithMouseWheel(container, 140);
             match = searchPopoverDOM();
 
             if (match || stepCount >= maxSteps) {
                 clearInterval(interval);
                 if (match) {
-                    log('✨ Найден вариант после скролла: "' + match.textContent.trim().substring(0, 30) + '"! Кликаем...', '#10b981');
+                    log('✨ Найден вариант после скролла: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
                     clickOptionRow(match);
                     setTimeout(function () {
                         if (callback) callback(true);
@@ -643,8 +657,9 @@
                     }, 500);
                 }
             }
-        }, 150);
+        }, 140);
     }
+
 
 
 
@@ -712,13 +727,14 @@
             return;
         }
 
-        if (voicePicker.textContent.includes('Den')) {
+        const voiceTxt = voicePicker.textContent.trim();
+        if (!voiceTxt.toLowerCase().includes('denis') && (voiceTxt === 'Den' || voiceTxt.startsWith('Den ') || voiceTxt.startsWith('Den\n'))) {
             log('✅ Голос "Den" уже выбран.', '#10b981');
             if (callback) callback();
             return;
         }
 
-        log('🎙️ [Шаг 2/2] Открываем меню выбора голоса (текущий: "' + voicePicker.textContent.trim() + '")...', '#38bdf8');
+        log('🎙️ [Шаг 2/2] Открываем меню выбора голоса (текущий: "' + voiceTxt + '")...', '#38bdf8');
         openDropdownElement(voicePicker);
 
         setTimeout(function () {
@@ -737,10 +753,11 @@
                     setTimeout(function () {
                         if (callback) callback();
                     }, 600);
-                });
+                }, true); // isExactWordOnly = true
             }, 300);
         }, 450);
     }
+
 
     function autoSelectLanguageAndVoice() {
         log('⚙️ Последовательная настройка: 1) Русский язык -> 2) Голос Den...', '#a78bfa');
@@ -774,7 +791,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.2</span>',
+            '  <span>🎙️ ElevenLabs v3.3</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -808,7 +825,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.2!');
+        log('Запущен ElevenLabs Assistant v3.3!');
+
 
 
 
