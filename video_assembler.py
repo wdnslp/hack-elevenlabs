@@ -99,8 +99,8 @@ def assemble_tiktok_video(
         print("✂️ Full Screen 9:16 (1080x1920) Video 1 for 1st half -> Video 2 for 2nd half")
         
         bg_filter = (
-            f"[0:v]trim=duration={half_dur},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setpts=PTS-STARTPTS[v1part];"
-            f"[1:v]trim=duration={rem_dur},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setpts=PTS-STARTPTS[v2part];"
+            f"[0:v]trim=duration={half_dur},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,setpts=PTS-STARTPTS[v1part];"
+            f"[1:v]trim=duration={rem_dur},scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,setpts=PTS-STARTPTS[v2part];"
             f"[v1part][v2part]concat=n=2:v=1:a=0[bg];"
         )
 
@@ -119,15 +119,16 @@ def assemble_tiktok_video(
             "-filter_complex", vf_filter,
             "-map", "[outv]",
             "-map", "3:a",  # Narration audio only (background video audio is muted!)
-            "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "18M",
-            "-c:a", "aac", "-b:a", "256k",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
             "-t", str(duration),
             abs_out
         ]
     elif len(bg_files) == 1:
         bg1 = bg_files[0]
         print(f"📹 Single Background Video: [{os.path.basename(bg1)}]")
-        bg_filter = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];"
+        bg_filter = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];"
         card_overlay = f"[1:v]scale=900:-1[scaled_card];[bg][scaled_card]overlay=x=(W-w)/2:y=240:enable='lte(t,4.5)':eval=frame[v1]"
         if os.path.exists(abs_ass):
             vf_filter = bg_filter + card_overlay + f";[v1]subtitles=filename='{escaped_ass}'[outv]"
@@ -142,8 +143,9 @@ def assemble_tiktok_video(
             "-filter_complex", vf_filter,
             "-map", "[outv]",
             "-map", "2:a",
-            "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "18M",
-            "-c:a", "aac", "-b:a", "256k",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
             "-t", str(duration),
             abs_out
         ]
@@ -152,9 +154,9 @@ def assemble_tiktok_video(
         bg_gen = f"color=c=0x0f1419:s=1080x1920:d={duration}"
         card_overlay = f"[1:v]scale=900:-1[scaled_card];[bg][scaled_card]overlay=x=(W-w)/2:y=240:enable='lte(t,4.5)':eval=frame[v1]"
         if os.path.exists(abs_ass):
-            vf_filter = f"[0:v]null[bg];" + card_overlay + f";[v1]subtitles=filename='{escaped_ass}'[outv]"
+            vf_filter = f"[0:v]setsar=1[bg];" + card_overlay + f";[v1]subtitles=filename='{escaped_ass}'[outv]"
         else:
-            vf_filter = f"[0:v]null[bg];" + card_overlay + f";[v1]copy[outv]"
+            vf_filter = f"[0:v]setsar=1[bg];" + card_overlay + f";[v1]copy[outv]"
 
         ffmpeg_cmd = [
             "ffmpeg", "-y", "-loglevel", "error",
@@ -164,8 +166,9 @@ def assemble_tiktok_video(
             "-filter_complex", vf_filter,
             "-map", "[outv]",
             "-map", "2:a",
-            "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-b:v", "10M", "-maxrate", "14M", "-bufsize", "18M",
-            "-c:a", "aac", "-b:a", "256k",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
             "-t", str(duration),
             abs_out
         ]

@@ -36,5 +36,15 @@
 
 ---
 
+## 🎬 Генерация субтитров через Gemini API
+
+Модуль `subtitle_generator.py` автоматически использует **Gemini API** (`GEMINI_API_KEY`) для транскрибации аудио и создания анимированных ASS караоке-субтитров. При отсутствии ключа или сбое происходит автоматический фоллбэк на `faster-whisper`.
+
+```bash
+python subtitle_generator.py --audio narration.mp3 --out subtitles.ass --engine auto
+```
+
+---
+
 ## 📄 Лицензия
 MIT License

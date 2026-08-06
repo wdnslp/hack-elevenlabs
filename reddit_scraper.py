@@ -20,7 +20,27 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-DEFAULT_SUBREDDITS = ["AskReddit", "AmItheAsshole", "tifu", "stories", "confession", "TwoSentenceHorror"]
+DEFAULT_SUBREDDITS = [
+    "TrueOffMyChest",
+    "ProRevenge",
+    "nosleep",
+    "entitledparents",
+    "AmItheAsshole",
+    "pettyrevenge",
+    "relationship_advice",
+    "TalesFromTechSupport",
+    "tifu",
+    "confession"
+]
+
+CATEGORIZED_SUBREDDITS = {
+    "drama": ["TrueOffMyChest", "AmItheAsshole", "relationship_advice", "confession"],
+    "revenge": ["ProRevenge", "pettyrevenge", "nuclearrevenge"],
+    "horror": ["nosleep", "scarystories", "Glitch_in_the_Matrix"],
+    "entitled": ["entitledparents", "entitledpeople"],
+    "workplace": ["TalesFromTechSupport", "TalesFromYourServer", "TalesFromRetail"],
+    "longform": ["HobbyDrama", "HFY", "ProRevenge"]
+}
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 SAMPLE_STORIES = [

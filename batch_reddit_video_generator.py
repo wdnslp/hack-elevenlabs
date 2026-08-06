@@ -186,7 +186,7 @@ def run_infinite_batch_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Infinite Batch Reddit TikTok Video Generator Loop")
-    parser.add_argument("--subreddit", type=str, default="stories", help="Subreddit name (stories, AmItheAsshole, tifu, AskReddit)")
+    parser.add_argument("--subreddit", type=str, default="TrueOffMyChest", help="Subreddit name (TrueOffMyChest, ProRevenge, nosleep, entitledparents, AmItheAsshole, pettyrevenge, relationship_advice, TalesFromTechSupport, tifu, confession)")
     parser.add_argument("--count", type=int, default=0, help="Number of videos to generate (0 = infinite loop until Ctrl+C)")
     parser.add_argument("--bg-dir", type=str, default="backgrounds", help="Background videos directory")
     parser.add_argument("--out-dir", type=str, default="output_batch_videos", help="Output directory for generated videos")
