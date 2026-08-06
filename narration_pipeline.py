@@ -107,11 +107,22 @@ def translate_to_russian(text: str) -> str:
         print(f"⚠️ Translation notice: {e}")
         return text
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+def load_env_file(env_path: str = ".env"):
+    """Load environment variables from .env file without external dependencies."""
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        if k.strip() not in os.environ:
+                            os.environ[k.strip()] = v.strip().strip("'\"")
+        except Exception:
+            pass
+
+load_env_file()
+
 
 def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
     """Use Gemini Flash API to translate English Reddit text to expressive, natural Russian and insert ElevenLabs v3 audio tags."""

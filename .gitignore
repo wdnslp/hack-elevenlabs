@@ -5,3 +5,4 @@ output_batch_videos/
 backgrounds/*.mp4
 .DS_Store
 *.log
+.env

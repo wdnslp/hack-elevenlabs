@@ -11,11 +11,22 @@ import json
 import argparse
 from typing import List, Dict, Any, Optional
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+def load_env_file(env_path: str = ".env"):
+    """Load environment variables from .env file without external dependencies."""
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        if k.strip() not in os.environ:
+                            os.environ[k.strip()] = v.strip().strip("'\"")
+        except Exception:
+            pass
+
+load_env_file()
+
 
 if hasattr(sys.stdout, 'reconfigure'):
     try:
@@ -117,12 +128,12 @@ def generate_ass_subtitles_gemini(audio_path: str, output_ass_path: str = "subti
         )
 
         models_to_try = [
-            "models/gemini-2.5-flash",
-            "models/gemini-2.0-flash",
-            "models/gemini-1.5-flash",
             "models/gemini-3.5-flash-lite",
-            "models/gemini-2.5-flash-lite"
+            "models/gemini-2.5-flash-lite",
+            "models/gemini-3.5-flash",
+            "models/gemini-2.5-flash"
         ]
+
 
         words_data = []
         try:
