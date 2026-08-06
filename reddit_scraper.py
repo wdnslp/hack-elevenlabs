@@ -97,49 +97,63 @@ def fetch_via_cdp(subreddit: str = "AskReddit", limit: int = 10) -> Optional[Dic
 
 def fetch_top_stories(
     subreddit: str = "stories",
-    time_filter: str = "day",
-    limit: int = 20,
+    time_filter: str = "all",
+    limit: int = 100,
     min_words: int = 120,
     max_words: int = 1500
 ) -> List[Dict[str, Any]]:
-    """Fetch stories using PullPush live API mirror, direct HTTP, CDP fallback, or sample stories."""
+    """Fetch top all-time, top year, top month and fresh stories using PullPush API and Reddit endpoints."""
     valid_stories = []
+    seen_ids = set()
 
-    # Priority 1: PullPush Live Reddit Mirror API
-    pullpush_url = f"https://api.pullpush.io/reddit/submission/search/?subreddit={subreddit}&size={limit}"
-    try:
-        req = urllib.request.Request(pullpush_url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            raw_json = json.loads(resp.read().decode('utf-8'))
-            items = raw_json.get("data", [])
-            for post_data in items:
-                title = post_data.get("title", "").strip()
-                body = clean_reddit_text(post_data.get("selftext", ""))
-                upvotes = post_data.get("score", post_data.get("ups", 0))
-                num_comments = post_data.get("num_comments", 0)
-                author = post_data.get("author", "anonymous")
-                post_id = post_data.get("id", "")
-                
-                full_text = f"{title}. {body}".strip() if body else title
-                words = len(full_text.split())
-                
-                if words >= min_words and words <= max_words:
-                    valid_stories.append({
-                        "id": post_id or f"post_{len(valid_stories)+1}",
-                        "subreddit": subreddit,
-                        "author": author,
-                        "title": title,
-                        "body": body,
-                        "full_text": full_text,
-                        "upvotes": upvotes,
-                        "num_comments": num_comments,
-                        "word_count": words
-                    })
-            if valid_stories:
-                print(f"🔥 Successfully scraped {len(valid_stories)} live Reddit stories from r/{subreddit} via PullPush!")
-                return valid_stories
-    except Exception as e:
-        print(f"⚠️ PullPush live API notice: {e}")
+    # Priority 1: PullPush Live Reddit Mirror API (Top score & top comments & recent)
+    pullpush_endpoints = [
+        f"https://api.pullpush.io/reddit/submission/search/?subreddit={subreddit}&sort=desc&sort_type=score&size={min(limit, 100)}",
+        f"https://api.pullpush.io/reddit/submission/search/?subreddit={subreddit}&sort=desc&sort_type=num_comments&size={min(limit, 100)}",
+        f"https://api.pullpush.io/reddit/submission/search/?subreddit={subreddit}&size={min(limit, 100)}"
+    ]
+
+    for p_url in pullpush_endpoints:
+        try:
+            req = urllib.request.Request(p_url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                raw_json = json.loads(resp.read().decode('utf-8'))
+                items = raw_json.get("data", [])
+                for post_data in items:
+                    post_id = post_data.get("id", "")
+                    if not post_id or post_id in seen_ids:
+                        continue
+
+                    title = post_data.get("title", "").strip()
+                    body = clean_reddit_text(post_data.get("selftext", ""))
+                    upvotes = post_data.get("score", post_data.get("ups", 0))
+                    num_comments = post_data.get("num_comments", 0)
+                    author = post_data.get("author", "anonymous")
+
+                    full_text = f"{title}. {body}".strip() if body else title
+                    words = len(full_text.split())
+
+                    if min_words <= words <= max_words:
+                        seen_ids.add(post_id)
+                        valid_stories.append({
+                            "id": post_id,
+                            "subreddit": subreddit,
+                            "author": author,
+                            "title": title,
+                            "body": body,
+                            "full_text": full_text,
+                            "upvotes": upvotes,
+                            "num_comments": num_comments,
+                            "word_count": words
+                        })
+        except Exception as e:
+            pass
+
+    if valid_stories:
+        valid_stories.sort(key=lambda x: x.get("upvotes", 0), reverse=True)
+        print(f"🔥 Scraped {len(valid_stories)} top all-time & popular Reddit stories from r/{subreddit} via PullPush!")
+        return valid_stories[:limit]
+
 
     # Priority 2: Direct Reddit HTTP JSON Endpoints
     urls = [

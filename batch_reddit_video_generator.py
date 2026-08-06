@@ -119,21 +119,22 @@ def run_infinite_batch_pipeline(
 
             # Replenish queue if empty
             if not story_queue:
-                print(f"📖 Fetching fresh stories from r/{subreddit}...")
-                fetched = fetch_top_stories(subreddit=subreddit, limit=25)
+                print(f"📖 Fetching top all-time & popular stories from r/{subreddit}...")
+                fetched = fetch_top_stories(subreddit=subreddit, limit=100)
                 for f_story in fetched:
                     s_id = f_story.get("id")
                     if s_id and s_id not in processed_story_ids:
                         story_queue.append(f_story)
 
                 if not story_queue:
-                    print("⚠️ All available new stories processed. Waiting 30s before checking for new Reddit posts...")
+                    print("⚠️ All available top stories processed. Waiting 30s before checking for new Reddit posts...")
                     time.sleep(30)
-                    fetched = fetch_top_stories(subreddit=subreddit, limit=25)
+                    fetched = fetch_top_stories(subreddit=subreddit, limit=100)
                     for f_story in fetched:
                         s_id = f_story.get("id")
                         if s_id and s_id not in processed_story_ids:
                             story_queue.append(f_story)
+
 
             if not story_queue:
                 print("⏳ Still waiting for brand new un-processed stories from Reddit...")
