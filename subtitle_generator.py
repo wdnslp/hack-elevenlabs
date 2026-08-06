@@ -275,8 +275,24 @@ def generate_ass_subtitles_gemini(audio_path: str, output_ass_path: str = "subti
         return None
 
 
+def setup_cuda_dll_paths():
+    """Ensure nvidia-cublas and nvidia-cudnn DLL paths are loaded into PATH and DLL directory on Windows."""
+    import site
+    for p in site.getsitepackages() + [site.getusersitepackages()]:
+        for sub in ["cublas", "cudnn"]:
+            bin_dir = os.path.join(p, "nvidia", sub, "bin")
+            if os.path.exists(bin_dir):
+                try:
+                    os.add_dll_directory(bin_dir)
+                except Exception:
+                    pass
+                if bin_dir not in os.environ.get("PATH", ""):
+                    os.environ["PATH"] = bin_dir + os.path.pathsep + os.environ.get("PATH", "")
+
+setup_cuda_dll_paths()
+
 def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subtitles.ass", model_size: str = "large-v3", device: str = "auto") -> str:
-    """Transcribe audio with faster-whisper (large-v3 model on CUDA GPU) and export karaoke ASS subtitles."""
+    """Transcribe audio with faster-whisper (large-v3 model on CUDA GPU with CPU fallback) and export karaoke ASS subtitles."""
     abs_audio = os.path.abspath(audio_path)
     abs_ass = os.path.abspath(output_ass_path)
     
@@ -286,18 +302,31 @@ def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subt
 
     from faster_whisper import WhisperModel
     
-    model = None
+    words_data = []
+
     if device in ("cuda", "auto"):
         try:
             print(f"🎙️ Transcribing {os.path.basename(abs_audio)} with faster-whisper ({model_size} on CUDA GPU)...")
             model = WhisperModel(model_size, device="cuda", compute_type="float16")
+            segments, info = model.transcribe(abs_audio, word_timestamps=True, language="ru")
+            for segment in segments:
+                if segment.words:
+                    for word in segment.words:
+                        raw_word = word.word.strip()
+                        clean_word = re.sub(r'\[.*?\]', '', raw_word).strip()
+                        if clean_word:
+                            words_data.append({
+                                "word": clean_word,
+                                "start": word.start,
+                                "end": word.end
+                            })
+            if words_data:
+                return build_ass_from_words_data(words_data, abs_ass)
         except Exception as cuda_err:
-            print(f"⚠️ CUDA Whisper init notice ({cuda_err}), falling back to CPU...")
+            print(f"⚠️ CUDA Whisper execution notice ({cuda_err}), falling back to CPU...")
 
-    if model is None:
-        print(f"🎙️ Transcribing {os.path.basename(abs_audio)} with faster-whisper ({model_size} on CPU)...")
-        model = WhisperModel(model_size, device="cpu", compute_type="int8")
-
+    print(f"🎙️ Transcribing {os.path.basename(abs_audio)} with faster-whisper ({model_size} on CPU)...")
+    model = WhisperModel(model_size, device="cpu", compute_type="int8")
     segments, info = model.transcribe(abs_audio, word_timestamps=True, language="ru")
 
     words_data = []
@@ -314,6 +343,7 @@ def generate_ass_subtitles_whisper(audio_path: str, output_ass_path: str = "subt
                     })
 
     return build_ass_from_words_data(words_data, abs_ass)
+
 
 def generate_ass_subtitles(
     audio_path: str,
