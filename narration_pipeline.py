@@ -77,7 +77,66 @@ def merge_mp3_chunks(chunk_files: List[str], output_path: str) -> bool:
             os.remove(list_file)
         return False
 
-def translate_to_russian(text: str) -> str:
+FEMALE_VERBS_MAP = {
+    'был': 'была', 'стал': 'стала', 'пошел': 'пошла', 'пришел': 'пришла', 'ушел': 'ушла',
+    'решил': 'решила', 'подумал': 'подумала', 'заметил': 'заметила', 'понял': 'поняла',
+    'хотел': 'хотела', 'сказал': 'сказала', 'начал': 'начала', 'остался': 'осталась',
+    'наткнулся': 'наткнулась', 'пытался': 'пыталась', 'надеялся': 'надеялась',
+    'почувствовал': 'почувствовала', 'вернулся': 'вернулась', 'увидел': 'увидела',
+    'услышал': 'услышала', 'сделал': 'сделала', 'взял': 'взяла', 'сбежал': 'сбежала',
+    'застрял': 'застряла', 'проснулся': 'проснулась', 'сдал': 'сдала', 'расцвел': 'расцвела',
+    'побежал': 'побежала', 'купил': 'купила', 'открыл': 'открыла', 'закрыл': 'закрыла',
+    'забыл': 'забыла', 'вспомнил': 'вспомнила', 'нашел': 'нашла', 'потерял': 'потеряла',
+    'попросил': 'попросила', 'спросил': 'спросила', 'ответил': 'ответила', 'дал': 'дала',
+    'шокирован': 'шокирована', 'расстроен': 'расстроена', 'удивлен': 'удивлена',
+    'напуган': 'напугана', 'уверен': 'уверена', 'ошарашен': 'ошарашена',
+    'разочарован': 'разочарована', 'обижен': 'обижена', 'поражен': 'поражена',
+    'взбешен': 'взбешена', 'унижен': 'унижена', 'ошеломлен': 'ошеломлена'
+}
+
+def is_female_narrator(eng_title: str, eng_body: str) -> bool:
+    """Detect if the English story is narrated by a female author."""
+    full_eng = f"{eng_title} {eng_body}".lower()
+    female_patterns = [
+        r'\b\d{2}\s*f\b', r'\bfemale\b', r'\bmy husband\b', r'\bmy boyfriend\b',
+        r'\bas a woman\b', r'\bas a girl\b', r'\bwhen i was pregnant\b', r'\bmy fiancé\b',
+        r'\bi\s*[\(\[]?\s*\d{2}\s*f\b', r'\b(i|me|my)\s+.*?\b(woman|girl|mother|mom|wife|sister|daughter)\b'
+    ]
+    male_patterns = [
+        r'\b\d{2}\s*m\b', r'\bmale\b', r'\bmy wife\b', r'\bmy girlfriend\b',
+        r'\bas a man\b', r'\bas a guy\b', r'\bmy fiancée\b'
+    ]
+    female_score = sum(1 for p in female_patterns if re.search(p, full_eng))
+    male_score = sum(1 for p in male_patterns if re.search(p, full_eng))
+    return female_score > male_score
+
+def fix_female_gender_endings(russian_text: str) -> str:
+    """Post-process Russian translation to ensure consistent female verb endings for 1st-person narrator."""
+    if not russian_text:
+        return ""
+    clauses = re.split(r'([,.;!?…\n]+)', russian_text)
+    res = []
+    for clause in clauses:
+        if re.search(r'\b(я|мне|меня|мной|мною)\b', clause, re.IGNORECASE):
+            def fix_word(match):
+                word = match.group(0)
+                w_low = word.lower()
+                if w_low in FEMALE_VERBS_MAP:
+                    mapped = FEMALE_VERBS_MAP[w_low]
+                    return mapped.capitalize() if word[0].isupper() else mapped
+                if w_low.endswith('лся'):
+                    mapped = w_low[:-3] + 'лась'
+                    return mapped.capitalize() if word[0].isupper() else mapped
+                if re.search(r'(ел|ал|ил|ул|ол)$', w_low) and not re.search(r'(вышел|нашел|пришел|ушел|пошел|зашел|перешел|посол|козел|осел|стол|пол|угол|чехол|сокол|ствол|узел|футбол)', w_low):
+                    mapped = w_low + 'а'
+                    return mapped.capitalize() if word[0].isupper() else mapped
+                return word
+
+            clause = re.sub(r'\b[а-яА-ЯёЁ]+\b', fix_word, clause)
+        res.append(clause)
+    return ''.join(res)
+
+def translate_to_russian(text: str, eng_context: str = "") -> str:
     """Translate English text to fluent Russian if not already in Russian."""
     if not text or not text.strip():
         return ""
@@ -100,6 +159,8 @@ def translate_to_russian(text: str) -> str:
                         translated_chunks.append(item[0])
             res_text = "".join(translated_chunks).strip()
             if res_text:
+                if is_female_narrator(eng_context or text, text):
+                    res_text = fix_female_gender_endings(res_text)
                 print(f"🌐 Translated to Russian: \"{res_text[:60]}...\"")
                 return res_text
             return text
@@ -131,15 +192,26 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
         print("⚠️ GEMINI_API_KEY is missing in environment! Gemini translation & tagging skipped, using Google Translate fallback.")
         return ""
 
-
     try:
         from google import genai
         client = genai.Client(api_key=api_key)
 
+        is_female = is_female_narrator(title, body)
+        gender_instruction = (
+            "КРИТИЧЕСКИ ВАЖНО ПО ПОВОДУ ГРАММАТИЧЕСКОГО РОДА:\n"
+            "Данная история вещется от ЖЕНСКОГО ЛИЦА (рассказчик — женщина)!\n"
+            "Все глаголы и краткие прилагательные от первого лица в прошедшем времени ОБЯЗАНЫ иметь только ЖЕНСКИЕ окончания:\n"
+            "(-ла, -лась, -лась, -на: я пошла, подумала, была, решила, осталась, была шокирована, увидела, расцвела).\n"
+            "НИ В КОЕМ СЛУЧАЕ не используй мужские окончания (я пошел, подумал, был)!"
+            if is_female else
+            "Определи пол автора по тексту истории (мужчина/женщина) и строго соблюдай единый грамматический род во всем тексте."
+        )
+
         prompt = (
             "Ты профессиональный диктор дубляжа и переводчик фильмов.\n"
             "Переведи данный англоязычный пост с Reddit на красивый, богатый, живой и естественный русский язык.\n"
-            "КРИТИЧЕСКИ ВАЖНО: Избегай дословных калек и дублирования синонимов (например, 'grateful and thankful' переводи как 'признательны и благодарны', а не 'благодарны и благодарны').\n\n"
+            f"{gender_instruction}\n"
+            "КРИТИЧЕСКИ ВАЖНО: Избегай дословных калек и дублирования синонимов.\n\n"
             "В процессе перевода расставь выразительные интонационные и эмоциональные аудио-теги в квадратных скобках [tag] для диктора ElevenLabs v3.\n"
             "Категории тегов ElevenLabs v3:\n"
             "- Звуки человека: [sigh], [gasp], [laughs], [giggles], [snorts], [gulps], [clears throat], [yawns]\n"
@@ -149,8 +221,10 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
         )
 
         for model_name in [
-            "models/gemini-3.5-flash-lite",
-            "models/gemini-3.1-flash-lite"
+            "models/gemini-flash-lite-latest",
+            "models/gemini-2.5-flash-lite",
+            "models/gemini-2.0-flash-lite",
+            "models/gemini-flash-latest"
         ]:
             try:
                 print(f"🤖 Requesting Gemini translation & ElevenLabs audio tags from {model_name}...")
@@ -161,6 +235,8 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
 
                 if resp and resp.text and len(resp.text.strip()) > 10:
                     clean_text = resp.text.strip().replace("```markdown", "").replace("```", "").strip()
+                    if is_female:
+                        clean_text = fix_female_gender_endings(clean_text)
                     print(f"✨ {model_name} successfully translated & tagged story!")
                     return clean_text
             except Exception as model_err:
@@ -178,11 +254,16 @@ def format_text_with_elevenlabs_tags(title: str, body: str, translate_ru: bool =
         if gemini_result:
             return gemini_result
             
-        title = translate_to_russian(title)
-        body = translate_to_russian(body)
+        title_ru = translate_to_russian(title, eng_context=f"{title} {body}")
+        body_ru = translate_to_russian(body, eng_context=f"{title} {body}")
+        if is_female_narrator(title, body):
+            title_ru = fix_female_gender_endings(title_ru)
+            body_ru = fix_female_gender_endings(body_ru)
+        title, body = title_ru, body_ru
 
     rule_tagged = f"[narrator] [calm] {title}\n\n[narrator] {body}"
     return rule_tagged
+
 
 
 
