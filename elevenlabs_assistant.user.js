@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 (function () {
     'use strict';
@@ -519,14 +520,30 @@
         });
     }
 
+    function scrollWithMouseWheel(container, deltaY) {
+        if (!container) return;
+        try {
+            container.scrollTop += deltaY;
+            const evt = new WheelEvent('wheel', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                deltaY: deltaY,
+                deltaMode: 0
+            });
+            container.dispatchEvent(evt);
+        } catch (e) { }
+    }
+
     function findAndClickOptionWithScroll(targetTexts, callback) {
-        const getActivePopover = () => {
+        const getActivePopovers = () => {
             const selectors = '[role="listbox"], [role="menu"], [data-radix-popper-content-wrapper], [aria-modal="true"], div[class*="select"], div[class*="dropdown"], div[class*="menu"], div[style*="position: absolute"], div[style*="position: fixed"]';
-            const popovers = Array.from(document.querySelectorAll(selectors));
-            return popovers.find(c => c.offsetHeight > 50 && c.offsetWidth > 50);
+            return Array.from(document.querySelectorAll(selectors)).filter(c => c.offsetHeight > 50 && c.offsetWidth > 50);
         };
 
-        let container = getActivePopover();
+        const popovers = getActivePopovers();
+        const container = popovers[popovers.length - 1];
+
         if (!container) {
             log('⚠️ Выпадающее окно (popover) не появилось на экране.', '#f59e0b');
             if (callback) callback(false);
@@ -534,7 +551,7 @@
         }
 
         function searchPopoverDOM() {
-            const nodes = Array.from(container.querySelectorAll('div, li, button, span, p, a, [role="option"]'));
+            const nodes = Array.from(container.querySelectorAll('*'));
             return nodes.find(el => {
                 if (el.children.length > 3) return false;
                 const txt = (el.textContent || '').trim().toLowerCase();
@@ -552,34 +569,40 @@
             match.scrollIntoView({ block: 'center' });
             setTimeout(function () {
                 openDropdownElement(match);
-                if (callback) callback(true);
-            }, 150);
+                setTimeout(function () {
+                    if (callback) callback(true);
+                }, 800);
+            }, 200);
             return;
         }
 
-        let currentScroll = 0;
-        const maxScroll = 2000;
-        const step = 150;
+        let stepCount = 0;
+        const maxSteps = 25;
 
         const interval = setInterval(function () {
-            currentScroll += step;
-            container.scrollTop = currentScroll;
+            stepCount++;
+            scrollWithMouseWheel(container, 180);
             match = searchPopoverDOM();
 
-            if (match || currentScroll >= maxScroll) {
+            if (match || stepCount >= maxSteps) {
                 clearInterval(interval);
                 if (match) {
                     match.scrollIntoView({ block: 'center' });
                     setTimeout(function () {
                         openDropdownElement(match);
-                        if (callback) callback(true);
-                    }, 150);
+                        setTimeout(function () {
+                            if (callback) callback(true);
+                        }, 800);
+                    }, 200);
                 } else {
-                    if (callback) callback(false);
+                    setTimeout(function () {
+                        if (callback) callback(false);
+                    }, 500);
                 }
             }
-        }, 120);
+        }, 160);
     }
+
 
     function selectRussianLanguage(callback) {
         const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
@@ -707,7 +730,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.0</span>',
+            '  <span>🎙️ ElevenLabs v3.1</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -741,7 +764,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.0!');
+        log('Запущен ElevenLabs Assistant v3.1!');
+
 
         document.getElementById('el-btn-auto-voice').addEventListener('click', function () {
             autoSelectLanguageAndVoice();
