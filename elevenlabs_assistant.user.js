@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      3.9
+// @version      4.0
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -766,13 +767,17 @@
 
 
     function autoSelectLanguageAndVoice() {
-        log('⚙️ Последовательная настройка: 1) Русский язык -> 2) Голос Den...', '#a78bfa');
-        selectRussianLanguage(function () {
-            selectVoiceDen(function () {
-                log('✅ Настройка языка и голоса завершена!', '#10b981');
+        log('⏳ Ожидание полной подгрузки элементов страницы и VPN (1 сек)...', '#38bdf8');
+        setTimeout(function () {
+            log('⚙️ Последовательная настройка: 1) Русский язык -> 2) Голос Den...', '#a78bfa');
+            selectRussianLanguage(function () {
+                selectVoiceDen(function () {
+                    log('✅ Настройка языка и голоса завершена!', '#10b981');
+                });
             });
-        });
+        }, 1000);
     }
+
 
     // --- 10. FLOATING UI WIDGET ---
     function createWidget() {
@@ -797,7 +802,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v3.9</span>',
+            '  <span>🎙️ ElevenLabs v4.0</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -831,7 +836,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v3.9!');
+        log('Запущен ElevenLabs Assistant v4.0!');
+
 
 
 
@@ -886,13 +892,14 @@
             isAutoPlay = e.target.checked;
         });
 
-        setTimeout(function () { fetchStoryFromLocalServer(false); }, 1000);
-        setTimeout(function () { autoSelectLanguageAndVoice(); }, 1800);
+        setTimeout(function () { fetchStoryFromLocalServer(false); }, 1500);
+        setTimeout(function () { autoSelectLanguageAndVoice(); }, 2800);
     }
 
     if (document.readyState === 'loading') {
-        window.addEventListener('DOMContentLoaded', function () { setTimeout(createWidget, 600); });
+        window.addEventListener('DOMContentLoaded', function () { setTimeout(createWidget, 1000); });
     } else {
-        setTimeout(createWidget, 600);
+        setTimeout(createWidget, 1000);
     }
+
 })();
