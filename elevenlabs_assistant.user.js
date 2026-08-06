@@ -1,14 +1,17 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      4.1
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
 // @connect      127.0.0.1
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -150,6 +153,7 @@
 
             const onUploadSuccess = function (respStr) {
                 try {
+                    setStoredLimitResets(0);
                     const resp = JSON.parse(respStr);
                     log('✅ КУСОК ' + (chunkIdx + 1) + '/' + totalChunks + ' УСПЕШНО ПЕРЕДАН В PYTHON! (' + resp.received_count + '/' + resp.total_chunks + ')', '#10b981');
                     if (resp.is_complete) {
@@ -160,6 +164,7 @@
                     }
                 } catch (e) { }
             };
+
 
             if (typeof GM_xmlhttpRequest === 'function') {
                 GM_xmlhttpRequest({
@@ -190,6 +195,25 @@
         reader.readAsDataURL(blob);
     }
 
+    function notifyPythonServerLimitReached(reason, resets) {
+        const payload = JSON.stringify({
+            reason: reason,
+            resets: resets,
+            timestamp: Date.now()
+        });
+        const url = "http://127.0.0.1:5000/api/limit_reached";
+        if (typeof GM_xmlhttpRequest === 'function') {
+            GM_xmlhttpRequest({
+                method: "POST",
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: payload
+            });
+        } else {
+            fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload }).catch(() => {});
+        }
+    }
+
     // --- 1. COOKIE AND SITE STORAGE AUTO-CLEANER ---
     function clearSiteData() {
         try {
@@ -206,26 +230,46 @@
         }
     }
 
-    // --- 2. SMART 2-STAGE LIMIT DETECTOR ---
-    function triggerIPSwitchInVPN() {
-        log('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ! Смените локацию в Turbo VPN вручную.', '#f59e0b');
-        showStatus('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН! Пожалуйста, переключите страну в Turbo VPN вручную.', '#ef4444');
+    // --- 2. SMART 2-STAGE LIMIT DETECTOR WITH GM STORAGE ---
+    function getStoredLimitResets() {
+        try {
+            if (typeof GM_getValue === 'function') return parseInt(GM_getValue('el_ip_resets', '0') || '0', 10);
+            return parseInt(sessionStorage.getItem('el_ip_resets') || '0', 10);
+        } catch (e) { return 0; }
+    }
+
+    function setStoredLimitResets(val) {
+        try {
+            if (typeof GM_setValue === 'function') GM_setValue('el_ip_resets', String(val));
+            sessionStorage.setItem('el_ip_resets', String(val));
+        } catch (e) { }
+    }
+
+    function triggerIPSwitchInVPN(resets) {
+        log('🌐 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ (Сбросов кук на этом IP: ' + resets + ')! Смените локацию в VPN!', '#ef4444');
+        showStatus('🚨 ТЕКУЩИЙ IP ЗАБЛОКИРОВАН ELEVENLABS! Смените страну/IP в VPN!', '#ef4444');
+        notifyPythonServerLimitReached('IP_HARD_BLOCKED', resets);
     }
 
     function handleLimitDetected(reason) {
         if (isLimitClearedRecently) return;
         isLimitClearedRecently = true;
 
-        if (!hasClearedCookiesForCurrentIP) {
-            hasClearedCookiesForCurrentIP = true;
-            log('🚨 ЛИМИТ ДЕТЕКТИРОВАН (' + reason + ')! [Шаг 1: Авто-сброс куки]', '#ef4444');
+        const currentResets = getStoredLimitResets() + 1;
+        setStoredLimitResets(currentResets);
+
+        log('🚨 ЛИМИТ ДЕТЕКТИРОВАН (' + reason + ')! [Сброс кук №' + currentResets + ' на этом IP]', '#ef4444');
+
+        if (currentResets < 4) {
             clearSiteData();
+            setTimeout(function () {
+                window.location.reload();
+            }, 600);
         } else {
-            log('🚨 ОЧИСТКА КУКИ НЕ ПОМОГЛА! ТЕКУЩИЙ IP ЗАБЛОКИРОВАН СЕРВИСОМ!', '#ef4444');
-            log('⚡ [Шаг 2: Ручное переключение IP в Turbo VPN]', '#f59e0b');
+            log('🚨 ОЧИСТКА КУКИ НЕ ПОМОГЛА (' + currentResets + ' сбросов подряд)! ТЕКУЩИЙ IP ЗАБЛОКИРОВАН!', '#ef4444');
             clearSiteData();
-            triggerIPSwitchInVPN();
-            hasClearedCookiesForCurrentIP = false;
+            triggerIPSwitchInVPN(currentResets);
+            setStoredLimitResets(0);
         }
 
         setTimeout(function () { isLimitClearedRecently = false; }, 4000);
@@ -245,6 +289,7 @@
     }
 
     setInterval(checkLimitModalOnDOM, 2500);
+
 
     // --- 3. BASE64 TO BLOB CONVERTER WITH URL-SAFE CLEANING ---
     function base64ToBlob(base64, mimeType) {
@@ -802,7 +847,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v4.0</span>',
+            '  <span>🎙️ ElevenLabs v4.1</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -836,7 +881,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v4.0!');
+        log('Запущен ElevenLabs Assistant v4.1!');
+
 
 
 

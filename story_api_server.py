@@ -131,10 +131,30 @@ class StoryApiRequestHandler(BaseHTTPRequestHandler):
                 self._send_cors_headers()
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path in ("/api/limit_reached", "/api/limit_reached/"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode("utf-8")) if post_data else {}
+                reason = data.get("reason", "unknown")
+                resets = data.get("resets", 0)
+                print(f"\n\a🚨 [SERVER ALERT] ELEVENLABS LIMIT DETECTED! Reason: {reason} (Resets on IP: {resets})")
+                print("🌐 ACTION REQUIRED: Please toggle location / switch IP in your VPN!\n")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ok", "message": "Limit notification received"}, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                self.send_response(400)
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
         else:
             self.send_response(404)
             self._send_cors_headers()
             self.end_headers()
+
 
     def log_message(self, format, *args):
         # Suppress standard HTTP request noise in console
