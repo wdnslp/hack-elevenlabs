@@ -54,6 +54,25 @@ def split_text_into_chunks(text: str, max_len: int = 920) -> List[str]:
 
     return chunks
 
+import glob
+
+def get_existing_video_raw_ids(output_dir: str) -> Set[str]:
+    """Extract raw_ids from completed videos in output_dir/videos/."""
+    video_dir = os.path.join(output_dir, "videos")
+    if not os.path.exists(video_dir):
+        return set()
+    
+    existing_raw_ids = set()
+    for fname in os.listdir(video_dir):
+        if fname.endswith("_tiktok.mp4"):
+            base = fname[:-len("_tiktok.mp4")]
+            parts = base.split("_")
+            if len(parts) >= 4:
+                raw_id = parts[-1]
+                existing_raw_ids.add(raw_id)
+            existing_raw_ids.add(base)
+    return existing_raw_ids
+
 def run_infinite_batch_pipeline(
     subreddit: str = "AskReddit",
     count: int = 0,  # 0 means infinite until Ctrl+C
@@ -78,9 +97,11 @@ def run_infinite_batch_pipeline(
     os.makedirs(os.path.join(abs_out_dir, "videos"), exist_ok=True)
 
     completed_videos: List[str] = []
-    processed_story_ids: Set[str] = set()
-    story_queue: List[Dict[str, Any]] = []
+    processed_story_ids: Set[str] = get_existing_video_raw_ids(abs_out_dir)
+    if processed_story_ids:
+        print(f"📁 Found {len(processed_story_ids)} existing videos on disk. Auto-skip enabled for existing stories!\n")
 
+    story_queue: List[Dict[str, Any]] = []
     story_counter = 0
 
     try:
@@ -110,8 +131,15 @@ def run_infinite_batch_pipeline(
             if raw_id in processed_story_ids:
                 continue
 
+            existing_matches = glob.glob(os.path.join(abs_out_dir, "videos", f"*{raw_id}_tiktok.mp4"))
+            if existing_matches:
+                print(f"⏩ Skipping story [{raw_id}] (\"{story.get('title', '')[:50]}...\"): Video already exists -> {os.path.basename(existing_matches[0])}")
+                processed_story_ids.add(raw_id)
+                continue
+
             processed_story_ids.add(raw_id)
             story_counter += 1
+
 
             from narration_pipeline import translate_to_russian
             title_ru = translate_to_russian(story.get("title", ""))
