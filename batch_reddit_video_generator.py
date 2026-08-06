@@ -57,20 +57,26 @@ def split_text_into_chunks(text: str, max_len: int = 920) -> List[str]:
 import glob
 
 def get_existing_video_raw_ids(output_dir: str) -> Set[str]:
-    """Extract raw_ids from completed videos in output_dir/videos/."""
-    video_dir = os.path.join(output_dir, "videos")
-    if not os.path.exists(video_dir):
-        return set()
-    
+    """Extract raw_ids from completed videos and skipped stories in output_dir."""
     existing_raw_ids = set()
-    for fname in os.listdir(video_dir):
-        if fname.endswith("_tiktok.mp4"):
-            base = fname[:-len("_tiktok.mp4")]
-            parts = base.split("_")
-            if len(parts) >= 4:
-                raw_id = parts[-1]
-                existing_raw_ids.add(raw_id)
-            existing_raw_ids.add(base)
+
+    video_dir = os.path.join(output_dir, "videos")
+    if os.path.exists(video_dir):
+        for fname in os.listdir(video_dir):
+            if fname.endswith("_tiktok.mp4"):
+                base = fname[:-len("_tiktok.mp4")]
+                parts = base.split("_")
+                if len(parts) >= 4:
+                    raw_id = parts[-1]
+                    existing_raw_ids.add(raw_id)
+                existing_raw_ids.add(base)
+
+    skipped_dir = os.path.join(output_dir, "skipped")
+    if os.path.exists(skipped_dir):
+        for fname in os.listdir(skipped_dir):
+            raw_id = fname.replace(".skip", "").replace(".txt", "")
+            existing_raw_ids.add(raw_id)
+
     return existing_raw_ids
 
 def run_infinite_batch_pipeline(
@@ -95,11 +101,12 @@ def run_infinite_batch_pipeline(
     os.makedirs(os.path.join(abs_out_dir, "audio"), exist_ok=True)
     os.makedirs(os.path.join(abs_out_dir, "subtitles"), exist_ok=True)
     os.makedirs(os.path.join(abs_out_dir, "videos"), exist_ok=True)
+    os.makedirs(os.path.join(abs_out_dir, "skipped"), exist_ok=True)
 
     completed_videos: List[str] = []
     processed_story_ids: Set[str] = get_existing_video_raw_ids(abs_out_dir)
     if processed_story_ids:
-        print(f"📁 Found {len(processed_story_ids)} existing videos on disk. Auto-skip enabled for existing stories!\n")
+        print(f"📁 Found {len(processed_story_ids)} existing/skipped stories on disk. Auto-skip enabled!\n")
 
     story_queue: List[Dict[str, Any]] = []
     story_counter = 0
@@ -120,10 +127,18 @@ def run_infinite_batch_pipeline(
                         story_queue.append(f_story)
 
                 if not story_queue:
-                    print("⚠️ All available stories processed. Resetting history log for infinite loop...")
-                    processed_story_ids.clear()
+                    print("⚠️ All available new stories processed. Waiting 30s before checking for new Reddit posts...")
+                    time.sleep(30)
+                    fetched = fetch_top_stories(subreddit=subreddit, limit=25)
                     for f_story in fetched:
-                        story_queue.append(f_story)
+                        s_id = f_story.get("id")
+                        if s_id and s_id not in processed_story_ids:
+                            story_queue.append(f_story)
+
+            if not story_queue:
+                print("⏳ Still waiting for brand new un-processed stories from Reddit...")
+                time.sleep(15)
+                continue
 
             # Pick next story from queue
             story = story_queue.pop(0)
@@ -132,10 +147,12 @@ def run_infinite_batch_pipeline(
                 continue
 
             existing_matches = glob.glob(os.path.join(abs_out_dir, "videos", f"*{raw_id}_tiktok.mp4"))
-            if existing_matches:
-                print(f"⏩ Skipping story [{raw_id}] (\"{story.get('title', '')[:50]}...\"): Video already exists -> {os.path.basename(existing_matches[0])}")
+            skip_matches = glob.glob(os.path.join(abs_out_dir, "skipped", f"*{raw_id}*"))
+            if existing_matches or skip_matches:
+                print(f"⏩ Skipping story [{raw_id}] (\"{story.get('title', '')[:50]}...\"): Video or skip record exists")
                 processed_story_ids.add(raw_id)
                 continue
+
 
             processed_story_ids.add(raw_id)
             story_counter += 1
@@ -182,8 +199,14 @@ def run_infinite_batch_pipeline(
             # Wait for Tampermonkey userscript to auto-send audio chunks or user skip command
             chunk_mp3_paths = wait_for_story_chunks(story_id=story_id, expected_chunks=total_chunks)
             if not chunk_mp3_paths:
-                print(f"⏩ Story [{story_id}] skipped by user. Advancing to next story...\n")
+                print(f"⏩ Story [{story_id}] skipped by user. Permanent skip recorded.\n")
+                skipped_dir = os.path.join(abs_out_dir, "skipped")
+                os.makedirs(skipped_dir, exist_ok=True)
+                with open(os.path.join(skipped_dir, f"{raw_id}.skip"), "w", encoding="utf-8") as sf:
+                    sf.write(f"Skipped {story_id}\n")
+                processed_story_ids.add(raw_id)
                 continue
+
 
             # Merge audio chunks for this specific story_id
             merged_audio_path = os.path.join(abs_out_dir, "audio", f"{story_id}_narration.mp3")
