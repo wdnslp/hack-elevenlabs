@@ -59,10 +59,10 @@ def rotate_proton_openvpn_ip() -> bool:
 
     print(f"⚡ [AUTOROTATE] Rotating IP via OpenVPN (ProtonVPN) to [{ovpn_file}]...")
     try:
-        subprocess.run([openvpn_gui, "--disconnect_all"], capture_output=True, timeout=10)
-        time.sleep(1.5)
-        subprocess.run([openvpn_gui, "--connect", ovpn_file], capture_output=True, timeout=15)
-        time.sleep(4)
+        subprocess.run([openvpn_gui, "--command", "disconnect_all"], capture_output=True, timeout=8)
+        time.sleep(1.0)
+        subprocess.run([openvpn_gui, "--connect", ovpn_file], capture_output=True, timeout=10)
+        time.sleep(3)
         print(f"✅ [AUTOROTATE] Connected to ProtonVPN [{ovpn_file}]!")
         return True
     except Exception as e:
