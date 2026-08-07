@@ -44,6 +44,7 @@ CURRENT_PROTON_INDEX = 0
 PROTON_LOCK = threading.Lock()
 
 CURRENT_OPENVPN_PROCESS = None
+LAST_CONNECTED_OVPN_FILE = ""
 FAILED_OVPN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "failed_ovpn_servers.json")
 COOLDOWN_SECONDS = 3 * 24 * 3600  # 3 days in seconds (72 hours)
 
@@ -112,6 +113,7 @@ def get_next_available_ovpn_file() -> str:
 
 def rotate_proton_openvpn_ip() -> bool:
     """Automated IP rotation using OpenVPN GUI CLI (Interactive Service) with automatic 3-day cooldown for failing servers."""
+    global LAST_CONNECTED_OVPN_FILE
     import subprocess
 
     openvpn_gui = r"C:\Program Files\OpenVPN\bin\openvpn-gui.exe"
@@ -125,9 +127,10 @@ def rotate_proton_openvpn_ip() -> bool:
             subprocess.run([openvpn_gui, "--command", "disconnect_all"], capture_output=True, timeout=3)
             time.sleep(0.5)
 
-            subprocess.Popen([openvpn_gui, "--command", "connect", ovpn_file])
+            subprocess.Popen([openvpn_gui, "--silent_connection", "1", "--command", "connect", ovpn_file])
             time.sleep(3.5)
 
+            LAST_CONNECTED_OVPN_FILE = ovpn_file
             mark_ovpn_success(ovpn_file)
             print(f"✅ [AUTOROTATE SUCCESS] Connected to ProtonVPN [{ovpn_file}]!")
             return True
@@ -246,8 +249,12 @@ class StoryApiRequestHandler(BaseHTTPRequestHandler):
             try:
                 data = json.loads(post_data.decode("utf-8")) if post_data else {}
                 reason = data.get("reason", "unknown")
-                resets = data.get("resets", 0)
                 print(f"\n\a🚨 [SERVER ALERT] ELEVENLABS LIMIT DETECTED! Reason: {reason}")
+                
+                # Immediately mark current server as failed (3-day cooldown) because its IP is blocked by ElevenLabs
+                if LAST_CONNECTED_OVPN_FILE:
+                    print(f"🚫 [SERVER ALERT] Placing [{LAST_CONNECTED_OVPN_FILE}] on 3-day cooldown due to ElevenLabs limit block!")
+                    mark_ovpn_failed(LAST_CONNECTED_OVPN_FILE)
                 
                 # Execute automatic ProtonVPN OpenVPN IP rotation in background thread
                 threading.Thread(target=rotate_proton_openvpn_ip, daemon=True).start()
