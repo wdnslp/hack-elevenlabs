@@ -108,10 +108,12 @@
                     updateUI();
 
                     if (isAutoPlay && chunks.length > 0 && currentChunkIdx < chunks.length) {
-                        log('▶️ [АВТО-СТАРТ] Автоматический запуск куска ' + (currentChunkIdx + 1) + '/' + chunks.length + '...', '#34d399');
-                        setTimeout(function () {
-                            injectAndPlayChunk(currentChunkIdx);
-                        }, 1200);
+                        log('▶️ [АВТО-СТАРТ] Проверка языка "Русский" и голоса "Den"...', '#34d399');
+                        autoSelectLanguageAndVoice(function () {
+                            setTimeout(function () {
+                                injectAndPlayChunk(currentChunkIdx);
+                            }, 500);
+                        });
                     }
                 } else if (!isAutoPoll) {
                     log('⚠️ На сервере нет готовой истории (статус: idle).', '#f59e0b');
@@ -664,11 +666,12 @@
             return;
         }
 
-        // Try using search input if available inside popover
+        // Try using search input if available inside popover (for both Voice and Language)
         const searchInput = container.querySelector('input[placeholder*="Search" i], input[type="search"]') || document.querySelector('input[placeholder*="Search" i], input[type="search"]');
-        if (searchInput && isExactWordOnly) {
+        if (searchInput && targetTexts && targetTexts.length > 0) {
+            const query = targetTexts[0];
             searchInput.focus();
-            setNativeValue(searchInput, 'Den');
+            setNativeValue(searchInput, query);
         }
 
         function searchPopoverDOM() {
@@ -753,7 +756,8 @@
         let langPicker = buttons.find(b => {
             const txt = (b.textContent || '').trim().toLowerCase();
             const aria = (b.getAttribute('aria-label') || '').toLowerCase();
-            return txt.includes('english') || txt.includes('russian') || txt.includes('русский') || aria.includes('language');
+            const hasFlag = Boolean(b.querySelector('img[alt*="flag" i], svg[data-icon="flag"]'));
+            return aria.includes('language') || hasFlag || txt.includes('english') || txt.includes('russian') || txt.includes('русский') || b.getAttribute('data-testid') === 'language-picker';
         });
 
         if (!langPicker) {
@@ -838,24 +842,16 @@
 
 
 
-    function autoSelectLanguageAndVoice() {
-        log('⏳ Ожидание полной подгрузки элементов страницы и VPN (1 сек)...', '#38bdf8');
-        setTimeout(function () {
-            log('⚙️ Последовательная настройка: 1) Русский язык -> 2) (пауза 400мс) -> 3) Голос Den...', '#a78bfa');
-            selectRussianLanguage(function () {
-                setTimeout(function () {
-                    selectVoiceDen(function () {
-                        log('✅ Настройка языка и голоса завершена!', '#10b981');
-                        if (isAutoPlay && chunks.length > 0 && currentChunkIdx < chunks.length) {
-                            setTimeout(function () {
-                                log('🚀 [АВТО-ПОДХВАТ] Запуск генерации куска ' + (currentChunkIdx + 1) + '/' + chunks.length + '...', '#34d399');
-                                injectAndPlayChunk(currentChunkIdx);
-                            }, 800);
-                        }
-                    });
-                }, 400); // 400ms pause between language and voice selection to let popover close cleanly
-            });
-        }, 1000);
+            function autoSelectLanguageAndVoice(onComplete) {
+        log('⚙️ Проверка параметров: 1) Русский язык ➔ 2) Голос Den...', '#a78bfa');
+        selectRussianLanguage(function () {
+            setTimeout(function () {
+                selectVoiceDen(function () {
+                    log('✅ Настройка языка и голоса завершена!', '#10b981');
+                    if (onComplete) onComplete();
+                });
+            }, 350);
+        });
     }
 
 
