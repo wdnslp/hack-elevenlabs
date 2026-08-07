@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      5.0
+// @version      5.1
 // @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Full Auto-Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
@@ -11,6 +11,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -840,20 +841,23 @@
     function autoSelectLanguageAndVoice() {
         log('⏳ Ожидание полной подгрузки элементов страницы и VPN (1 сек)...', '#38bdf8');
         setTimeout(function () {
-            log('⚙️ Последовательная настройка: 1) Русский язык -> 2) Голос Den...', '#a78bfa');
+            log('⚙️ Последовательная настройка: 1) Русский язык -> 2) (пауза 400мс) -> 3) Голос Den...', '#a78bfa');
             selectRussianLanguage(function () {
-                selectVoiceDen(function () {
-                    log('✅ Настройка языка и голоса завершена!', '#10b981');
-                    if (isAutoPlay && chunks.length > 0 && currentChunkIdx < chunks.length) {
-                        setTimeout(function () {
-                            log('🚀 [АВТО-ПОДХВАТ] Запуск генерации куска ' + (currentChunkIdx + 1) + '/' + chunks.length + '...', '#34d399');
-                            injectAndPlayChunk(currentChunkIdx);
-                        }, 800);
-                    }
-                });
+                setTimeout(function () {
+                    selectVoiceDen(function () {
+                        log('✅ Настройка языка и голоса завершена!', '#10b981');
+                        if (isAutoPlay && chunks.length > 0 && currentChunkIdx < chunks.length) {
+                            setTimeout(function () {
+                                log('🚀 [АВТО-ПОДХВАТ] Запуск генерации куска ' + (currentChunkIdx + 1) + '/' + chunks.length + '...', '#34d399');
+                                injectAndPlayChunk(currentChunkIdx);
+                            }, 800);
+                        }
+                    });
+                }, 400); // 400ms pause between language and voice selection to let popover close cleanly
             });
         }, 1000);
     }
+
 
 
 
@@ -880,7 +884,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v5.0 (Full Auto)</span>',
+            '  <span>🎙️ ElevenLabs v5.1 (Full Auto)</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -914,7 +918,8 @@
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v5.0 (Full Auto)!');
+        log('Запущен ElevenLabs Assistant v5.1 (Full Auto)!');
+
 
 
 
