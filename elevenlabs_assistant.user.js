@@ -666,90 +666,95 @@
             return;
         }
 
-        // Try using search input if available inside popover (for both Voice and Language)
         const searchInput = container.querySelector('input[placeholder*="Search" i], input[type="search"]') || document.querySelector('input[placeholder*="Search" i], input[type="search"]');
         if (searchInput && targetTexts && targetTexts.length > 0) {
             const query = targetTexts[0];
             searchInput.focus();
             setNativeValue(searchInput, query);
+            try {
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (e) { }
         }
 
         function searchPopoverDOM() {
-            const nodes = Array.from(container.querySelectorAll('button, div, li, span, p, a, [role="option"]'));
+            const nodes = Array.from(container.querySelectorAll('[role="option"], button, li, div[data-value], div[data-key], div.cursor-pointer, div, span, p'));
             return nodes.find(el => {
-                const txt = (el.textContent || '').trim().toLowerCase();
-                if (!txt || txt.length > 80) return false;
+                const txt = (el.textContent || '').trim();
+                if (!txt || txt.length > 120) return false;
+                const low = txt.toLowerCase();
+
+                if (isExactWordOnly || targetTexts.some(t => t.toLowerCase() === 'den')) {
+                    if (low.includes('denis') || low.includes('dennis')) return false;
+                }
 
                 const isMatch = targetTexts.some(t => {
                     const lowT = t.toLowerCase();
-                    if (lowT === 'den' || isExactWordOnly) {
-                        if (txt.includes('denis') || txt.includes('dennis')) return false;
-                        return txt === 'den' ||
-                            txt.startsWith('den ') ||
-                            txt.startsWith('den\n') ||
-                            txt.startsWith('den (') ||
-                            txt.startsWith('den-');
+                    if (lowT === 'den') {
+                        return low === 'den' ||
+                            low.startsWith('den ') ||
+                            low.startsWith('den\n') ||
+                            low.startsWith('den (') ||
+                            low.startsWith('den-');
                     }
-                    return txt === lowT ||
-                        txt.startsWith(lowT + ' ') ||
-                        txt.startsWith(lowT + '\n') ||
-                        txt.indexOf(lowT) !== -1;
+                    return low === lowT ||
+                        low.startsWith(lowT + ' ') ||
+                        low.startsWith(lowT + '\n') ||
+                        low.indexOf(lowT) !== -1;
                 });
 
                 if (!isMatch) return false;
 
-                const hasMatchingChild = Array.from(el.children).some(child => {
+                const childMatches = Array.from(el.children).some(child => {
                     const cTxt = (child.textContent || '').trim().toLowerCase();
+                    if (!cTxt || cTxt.length > 120) return false;
                     if (targetTexts.some(t => t.toLowerCase() === 'den')) {
                         if (cTxt.includes('denis') || cTxt.includes('dennis')) return false;
                         return cTxt === 'den' || cTxt.startsWith('den ') || cTxt.startsWith('den\n') || cTxt.startsWith('den (');
                     }
-                    return targetTexts.some(t => cTxt.includes(t.toLowerCase()));
+                    return targetTexts.some(t => cTxt === t.toLowerCase());
                 });
 
-                return !hasMatchingChild && el.offsetHeight > 0 && el.offsetHeight < 120;
+                return !childMatches && el.offsetWidth > 0 && el.offsetHeight > 0;
             });
         }
 
-        let match = searchPopoverDOM();
-        if (match) {
-            log('✨ Найден элемент в списке: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
-            clickOptionRow(match);
-            setTimeout(function () {
-                if (callback) callback(true);
-            }, 600);
-            return;
-        }
-
-        let stepCount = 0;
-        const maxSteps = 45;
-
-        const interval = setInterval(function () {
-            stepCount++;
-            scrollWithMouseWheel(container, 500); // 500px step per scroll!
-            match = searchPopoverDOM();
-
-            if (match || stepCount >= maxSteps) {
-                clearInterval(interval);
-                if (match) {
-                    log('✨ Найден вариант при турбо-скролле (500px): "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
-                    clickOptionRow(match);
-                    setTimeout(function () {
-                        if (callback) callback(true);
-                    }, 500);
-                } else {
-                    setTimeout(function () {
-                        if (callback) callback(false);
-                    }, 300);
-                }
+        setTimeout(function () {
+            let match = searchPopoverDOM();
+            if (match) {
+                log('✨ Найден элемент в списке: "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+                clickOptionRow(match);
+                setTimeout(function () {
+                    if (callback) callback(true);
+                }, 600);
+                return;
             }
-        }, 45);
+
+            let stepCount = 0;
+            const maxSteps = 45;
+
+            const interval = setInterval(function () {
+                stepCount++;
+                scrollWithMouseWheel(container, 500);
+                match = searchPopoverDOM();
+
+                if (match || stepCount >= maxSteps) {
+                    clearInterval(interval);
+                    if (match) {
+                        log('✨ Найден вариант при турбо-скролле (500px): "' + match.textContent.trim().substring(0, 35) + '"! Кликаем...', '#10b981');
+                        clickOptionRow(match);
+                        setTimeout(function () {
+                            if (callback) callback(true);
+                        }, 500);
+                    } else {
+                        setTimeout(function () {
+                            if (callback) callback(false);
+                        }, 300);
+                    }
+                }
+            }, 45);
+        }, 180);
     }
-
-
-
-
-
 
     function selectRussianLanguage(callback) {
         const buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
@@ -784,9 +789,9 @@
                 }
                 setTimeout(function () {
                     if (callback) callback();
-                }, 300);
+                }, 400);
             });
-        }, 200);
+        }, 250);
     }
 
     function selectVoiceDen(callback) {
@@ -835,14 +840,12 @@
                 }
                 setTimeout(function () {
                     if (callback) callback();
-                }, 300);
+                }, 400);
             }, true); // isExactWordOnly = true
-        }, 200);
+        }, 350);
     }
 
-
-
-            function autoSelectLanguageAndVoice(onComplete) {
+    function autoSelectLanguageAndVoice(onComplete) {
         log('⚙️ Проверка параметров: 1) Русский язык ➔ 2) Голос Den...', '#a78bfa');
         selectRussianLanguage(function () {
             setTimeout(function () {
@@ -850,7 +853,7 @@
                     log('✅ Настройка языка и голоса завершена!', '#10b981');
                     if (onComplete) onComplete();
                 });
-            }, 350);
+            }, 700);
         });
     }
 
