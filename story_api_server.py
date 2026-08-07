@@ -35,27 +35,43 @@ CURRENT_STORY_DATA: Dict[str, Any] = {
 RECEIVED_STORY_CHUNKS: Dict[str, Dict[int, str]] = {}
 CHUNKS_LOCK = threading.Lock()
 
-def rotate_vpn_ip() -> bool:
-    """Automated IP rotation using Cloudflare WARP CLI."""
+PROTON_OVPN_FILES = [
+    "ca-free-5.protonvpn.udp.ovpn",
+    "nl-free-79.protonvpn.udp.ovpn",
+    "jp-free-23.protonvpn.udp.ovpn",
+    "no-free-5.protonvpn.udp.ovpn",
+    "mx-free-3.protonvpn.udp.ovpn",
+    "ch-free-3.protonvpn.udp.ovpn",
+    "nl-free-131.protonvpn.udp.ovpn",
+    "ca-free-26.protonvpn.udp.ovpn"
+]
+CURRENT_PROTON_INDEX = 0
+PROTON_LOCK = threading.Lock()
+
+def rotate_proton_openvpn_ip() -> bool:
+    """Automated IP rotation using OpenVPN GUI CLI for ProtonVPN."""
+    global CURRENT_PROTON_INDEX
     import subprocess
-    warp_cli_path = r"C:\Program Files\Cloudflare\Cloudflare WARP\warp-cli.exe"
 
-    print("⚡ [AUTOROTATE] Initiating auto IP rotation via Cloudflare WARP CLI...")
+    openvpn_gui = r"C:\Program Files\OpenVPN\bin\openvpn-gui.exe"
+    if not os.path.exists(openvpn_gui):
+        print("⚠️ [AUTOROTATE WARN] openvpn-gui.exe not found!")
+        return False
+
+    with PROTON_LOCK:
+        ovpn_file = PROTON_OVPN_FILES[CURRENT_PROTON_INDEX % len(PROTON_OVPN_FILES)]
+        CURRENT_PROTON_INDEX += 1
+
+    print(f"⚡ [AUTOROTATE] Rotating IP via OpenVPN (ProtonVPN) to [{ovpn_file}]...")
     try:
-        cmd = warp_cli_path if os.path.exists(warp_cli_path) else "warp-cli"
-        try:
-            subprocess.run([cmd, "registration", "new"], capture_output=True, timeout=10)
-        except Exception:
-            pass
-
-        subprocess.run([cmd, "disconnect"], capture_output=True, timeout=10)
+        subprocess.run([openvpn_gui, "--disconnect_all"], capture_output=True, timeout=10)
         time.sleep(1.5)
-        res = subprocess.run([cmd, "connect"], capture_output=True, timeout=10)
-        time.sleep(2.5)
-        print("✅ [AUTOROTATE] Cloudflare WARP IP successfully rotated!")
+        subprocess.run([openvpn_gui, "--connect", ovpn_file], capture_output=True, timeout=15)
+        time.sleep(4)
+        print(f"✅ [AUTOROTATE] Connected to ProtonVPN [{ovpn_file}]!")
         return True
     except Exception as e:
-        print(f"⚠️ [AUTOROTATE WARN] Automatic WARP CLI rotation failed: {e}")
+        print(f"⚠️ [AUTOROTATE WARN] OpenVPN rotation failed: {e}")
         return False
 
 class StoryApiRequestHandler(BaseHTTPRequestHandler):
@@ -169,8 +185,8 @@ class StoryApiRequestHandler(BaseHTTPRequestHandler):
                 resets = data.get("resets", 0)
                 print(f"\n\a🚨 [SERVER ALERT] ELEVENLABS LIMIT DETECTED! Reason: {reason}")
                 
-                # Execute automatic VPN IP rotation in background thread
-                threading.Thread(target=rotate_vpn_ip, daemon=True).start()
+                # Execute automatic ProtonVPN OpenVPN IP rotation in background thread
+                threading.Thread(target=rotate_proton_openvpn_ip, daemon=True).start()
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")

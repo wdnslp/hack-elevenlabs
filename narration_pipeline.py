@@ -197,37 +197,59 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
         client = genai.Client(api_key=api_key)
 
         is_female = is_female_narrator(title, body)
-        gender_instruction = (
-            "КРИТИЧЕСКИ ВАЖНО ПО ПОВОДУ ГРАММАТИЧЕСКОГО РОДА:\n"
-            "Данная история вещется от ЖЕНСКОГО ЛИЦА (рассказчик — женщина)!\n"
-            "Все глаголы и краткие прилагательные от первого лица в прошедшем времени ОБЯЗАНЫ иметь только ЖЕНСКИЕ окончания:\n"
-            "(-ла, -лась, -лась, -на: я пошла, подумала, была, решила, осталась, была шокирована, увидела, расцвела).\n"
-            "НИ В КОЕМ СЛУЧАЕ не используй мужские окончания (я пошел, подумал, был)!"
-            if is_female else
-            "Определи пол автора по тексту истории (мужчина/женщина) и строго соблюдай единый грамматический род во всем тексте."
-        )
+        if is_female:
+            gender_instruction = (
+                "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ГРАММАТИЧЕСКОГО РОДА:\n"
+                "Автор истории — ЖЕНЩИНА (девушка). Весь рассказ от первого лица ('я') ДОЛЖЕН БЫТЬ СТРОГО В ЖЕНСКОМ РОДЕ!\n"
+                "Используй исключительно женские окончания в прошедшем времени и причастиях:\n"
+                "(я пошла, я подумала, я была, я осталась, я решила, я увидела, я была шокирована, я вернулась).\n"
+                "СТРОЖАЙШЕ ЗАПРЕЩЕНО использовать мужской род (я пошел, подумал, был) или менять пол в течение истории!"
+            )
+        else:
+            gender_instruction = (
+                "🚨 КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО ГРАММАТИЧЕСКОГО РОДА:\n"
+                "Внимательно определи пол автора истории по контексту (мужчина или женщина) и соблюдай 100% ЕДИНЫЙ грамматический род от первого лица ('я') от первого до последнего слова!\n"
+                "СТРОЖАЙШЕ ЗАПРЕЩЕНО путать пол или сменять мужской род на женский (или наоборот) в пределах одной истории!"
+            )
 
         prompt = (
-            "Ты профессиональный диктор дубляжа и переводчик фильмов.\n"
-            "Переведи данный англоязычный пост с Reddit на красивый, богатый, живой и естественный русский язык.\n"
-            f"{gender_instruction}\n"
-            "КРИТИЧЕСКИ ВАЖНО: Избегай дословных калек и дублирования синонимов.\n\n"
-            "В процессе перевода расставь выразительные интонационные и эмоциональные аудио-теги в квадратных скобках [tag] для диктора ElevenLabs v3.\n"
-            "Категории тегов ElevenLabs v3:\n"
-            "- Звуки человека: [sigh], [gasp], [laughs], [giggles], [snorts], [gulps], [clears throat], [yawns]\n"
-            "- Эмоции и подача: [narrator], [whisper], [shouts], [sarcastic], [playfully], [flatly], [mumbles], [dramatic], [excited], [tired], [nervous], [frustrated], [sorrowful], [calm], [furious], [softly], [pauses]\n\n"
-            "Формат ответа: Верни ТОЛЬКО итоговый переведённый и размеченный текст на русском языке. Без пояснений и без markdown оформления.\n\n"
-            f"Оригинальный заголовок:\n{title}\n\nОригинальная история:\n{body}"
+            "Ты признанный переводчик художественной литературы и режиссер дубляжа мирового уровня.\n"
+            "Переведи данный пост с Reddit на живой, эмоциональный, богатый и естественный русский язык.\n\n"
+            f"{gender_instruction}\n\n"
+            "═════════════════════════════════════════════════════════════════════════\n"
+            "ОФИЦИАЛЬНОЕ РУКОВОДСТВО ПО АУДИО-ТЕГАМ И ОЗВУЧКЕ ELEVENLABS V3:\n"
+            "═════════════════════════════════════════════════════════════════════════\n"
+            "⚠️ КРИТИЧЕСКИ ВАЖНО: Модель ElevenLabs v3 НЕ ПОДДЕРЖИВАЕТ SSML (<break>, <prosody>, <emphasis>).\n"
+            "НИКОГДА НЕ ИСПОЛЬЗУЙ XML/HTML ТЕГИ! Заменяй все элементы режиссуры только на Натуральные Теги в квадратных скобках [tag] и знаки препинания:\n\n"
+            "1. ТАБЛИЦА ЗАМЕНЫ SSML И РЕГУЛИРОВКИ ТЕМПА:\n"
+            "   - Вместо <break time='1s'> ➔ используй теги [pauses], [pause] или многоточие '...'\n"
+            "   - Вместо <prosody rate='slow'> ➔ используй [slowly] или [drawn out]\n"
+            "   - Вместо <prosody rate='fast'> ➔ используй [rushed]\n"
+            "   - Вместо <emphasis> ➔ используй [shouts] или ПИШИ ВАЖНЫЕ СЛОВА КАПСОМ (например: 'ИМЕННО ТАК', 'НИКОГДА')\n"
+            "   - Вместо <prosody pitch='high'> ➔ используй [excited], [surprised], [awe]\n"
+            "   - Вместо <prosody pitch='low'> ➔ используй [softly], [sorrowful], [whisper]\n\n"
+            "2. КАТЕГОРИИ АУДИО-ТЕГОВ (вставляй в квадратных скобках [tag] перед фразами):\n"
+            "   - Эмоциональный тон: [happy], [sad], [angry], [sorrowful], [dramatic], [excited], [tired], [nervous], [frustrated], [furious], [calm], [panicking], [cautiously], [dismissive], [cheeky], [awe], [booming], [worried], [upset]\n"
+            "   - Подача и темп: [whisper], [shouts], [softly], [drawn out], [slowly], [rushed], [pauses], [flatly], [mumbles], [starting to speak], [beginning to speak], [interrupting], [overlapping]\n"
+            "   - Человеческие реакции: [sigh], [gasp], [laughs], [giggles], [big laugh], [light chuckle], [clears throat], [snorts], [gulps], [yawns], [coughing]\n"
+            "   - Акценты / Персонажи (в диалогах): [French accent], [British accent], [Australian accent], [pirate voice]\n"
+            "   - Звуковые эффекты: [gunshot], [explosion], [clapping]\n\n"
+            "3. КОМБИНИРОВАНИЕ И ПРЕПИНАНИЕ:\n"
+            "   - Можно комбинировать несколько тегов подряд для глубокой подачи: [tired] [upset], [dramatic] [gasp], [coughing] [beginning to speak].\n"
+            "   - Используй многоточия (...) для колеблющихся пауз, запятые для естественного дыхания и КАПС для акцентирования слов.\n\n"
+            "ФОРМАТ ОТВЕТА: Верни ТОЛЬКО итоговый переведённый текст истории на русском языке с вкрапленными тегами [tag]. Без пояснений, без вводных слов и без markdown блоков.\n\n"
+            f"Заголовок:\n{title}\n\nИстория:\n{body}"
         )
 
         for model_name in [
-            "models/gemini-flash-lite-latest",
-            "models/gemini-2.5-flash-lite",
-            "models/gemini-2.0-flash-lite",
-            "models/gemini-flash-latest"
+            "models/gemini-3.5-flash-lite",
+            "models/gemini-3.5-flash",
+            "models/gemini-3.1-flash-lite",
+            "models/gemini-3-flash-preview",
+            "models/gemini-flash-lite-latest"
         ]:
             try:
-                print(f"🤖 Requesting Gemini translation & ElevenLabs audio tags from {model_name}...")
+                print(f"🤖 Requesting Gemini 3.5 Flash translation & ElevenLabs tags from {model_name}...")
                 resp = client.models.generate_content(
                     model=model_name,
                     contents=prompt
@@ -235,33 +257,28 @@ def tag_and_translate_story_with_gemini(title: str, body: str) -> str:
 
                 if resp and resp.text and len(resp.text.strip()) > 10:
                     clean_text = resp.text.strip().replace("```markdown", "").replace("```", "").strip()
-                    if is_female:
-                        clean_text = fix_female_gender_endings(clean_text)
-                    print(f"✨ {model_name} successfully translated & tagged story!")
+                    print(f"✨ {model_name} successfully translated & tagged story with strict gender consistency!")
                     return clean_text
             except Exception as model_err:
                 print(f"⚠️ {model_name} unavailable, trying next model: {model_err}")
                 continue
     except Exception as e:
-        print(f"⚠️ Gemini translation notice: {e}")
+        print(f"⚠️ Gemini translation error: {e}")
 
     return ""
 
 def format_text_with_elevenlabs_tags(title: str, body: str, translate_ru: bool = True) -> str:
-    """Format title and body into expressive ElevenLabs tagged script (via Gemini AI translation or rule fallback)."""
+    """Format title and body into expressive ElevenLabs tagged script via Gemini 3.5 Flash AI."""
     if translate_ru:
         gemini_result = tag_and_translate_story_with_gemini(title, body)
         if gemini_result:
             return gemini_result
             
-        title_ru = translate_to_russian(title, eng_context=f"{title} {body}")
-        body_ru = translate_to_russian(body, eng_context=f"{title} {body}")
-        if is_female_narrator(title, body):
-            title_ru = fix_female_gender_endings(title_ru)
-            body_ru = fix_female_gender_endings(body_ru)
-        title, body = title_ru, body_ru
+        print("⚠️ Gemini translation unavailable! Using native text formatting.")
 
     rule_tagged = f"[narrator] [calm] {title}\n\n[narrator] {body}"
+    if is_female_narrator(title, body):
+        rule_tagged = fix_female_gender_endings(rule_tagged)
     return rule_tagged
 
 

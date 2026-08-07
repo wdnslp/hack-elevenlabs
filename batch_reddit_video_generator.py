@@ -108,6 +108,24 @@ def run_infinite_batch_pipeline(
     if processed_story_ids:
         print(f"📁 Found {len(processed_story_ids)} existing/skipped stories on disk. Auto-skip enabled!\n")
 
+    SUBREDDIT_POOL = [
+        "ru_Reddit",
+        "pikabu",
+        "askru",
+        "AskReddit_RU",
+        "TrueOffMyChest",
+        "AmItheAsshole",
+        "confession",
+        "pettyrevenge",
+        "ProRevenge",
+        "nosleep",
+        "tifu"
+    ]
+    if subreddit and subreddit.upper() not in ["AUTO", "ALL"]:
+        # Put user specified subreddit first
+        SUBREDDIT_POOL = [subreddit] + [s for s in SUBREDDIT_POOL if s.lower() != subreddit.lower()]
+
+    pool_idx = 0
     story_queue: List[Dict[str, Any]] = []
     story_counter = 0
 
@@ -119,26 +137,29 @@ def run_infinite_batch_pipeline(
 
             # Replenish queue if empty
             if not story_queue:
-                print(f"📖 Fetching top all-time & popular stories from r/{subreddit}...")
-                fetched = fetch_top_stories(subreddit=subreddit, limit=100)
-                for f_story in fetched:
-                    s_id = f_story.get("id")
-                    if s_id and s_id not in processed_story_ids:
-                        story_queue.append(f_story)
-
-                if not story_queue:
-                    print("⚠️ All available top stories processed. Waiting 30s before checking for new Reddit posts...")
-                    time.sleep(30)
-                    fetched = fetch_top_stories(subreddit=subreddit, limit=100)
+                attempts = 0
+                while len(story_queue) < 5 and attempts < len(SUBREDDIT_POOL) * 2:
+                    target_sub = SUBREDDIT_POOL[pool_idx % len(SUBREDDIT_POOL)]
+                    pool_idx += 1
+                    attempts += 1
+                    print(f"📖 Fetching stories from r/{target_sub}...")
+                    fetched = fetch_top_stories(subreddit=target_sub, limit=10)
+                    added_from_sub = 0
                     for f_story in fetched:
                         s_id = f_story.get("id")
                         if s_id and s_id not in processed_story_ids:
                             story_queue.append(f_story)
+                            added_from_sub += 1
+                            if added_from_sub >= 2:
+                                break
 
+                if not story_queue:
+                    print("⚠️ All subreddits exhausted. Waiting 20s before next scan...")
+                    time.sleep(20)
 
             if not story_queue:
                 print("⏳ Still waiting for brand new un-processed stories from Reddit...")
-                time.sleep(15)
+                time.sleep(10)
                 continue
 
             # Pick next story from queue
@@ -154,14 +175,25 @@ def run_infinite_batch_pipeline(
                 processed_story_ids.add(raw_id)
                 continue
 
-
             processed_story_ids.add(raw_id)
             story_counter += 1
 
+            sub_name = story.get("subreddit", subreddit)
+            sub_lower = sub_name.lower()
+            is_russian_sub = any(r in sub_lower for r in ["ru_reddit", "pikabu", "askru", "askreddit_ru", "russian"])
 
-            from narration_pipeline import translate_to_russian
-            title_ru = translate_to_russian(story.get("title", ""))
-            body_ru = translate_to_russian(story.get("body", ""))
+            title_orig = story.get("title", "")
+            body_orig = story.get("body", "")
+
+            if is_russian_sub:
+                print(f"🇷🇺 Native Russian story detected from r/{sub_name}. Skipping translation!")
+                title_ru = title_orig
+                body_ru = body_orig
+            else:
+                from narration_pipeline import translate_to_russian
+                title_ru = translate_to_russian(title_orig)
+                body_ru = translate_to_russian(body_orig)
+
             story["title"] = title_ru
             story["body"] = body_ru
             story["full_text"] = f"{title_ru}. {body_ru}".strip()
@@ -243,7 +275,7 @@ def run_infinite_batch_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Infinite Batch Reddit TikTok Video Generator Loop")
-    parser.add_argument("--subreddit", type=str, default="TrueOffMyChest", help="Subreddit name (TrueOffMyChest, ProRevenge, nosleep, entitledparents, AmItheAsshole, pettyrevenge, relationship_advice, TalesFromTechSupport, tifu, confession)")
+    parser.add_argument("--subreddit", type=str, default="AUTO", help="Subreddit name or 'AUTO' for continuous multi-subreddit pool rotation")
     parser.add_argument("--count", type=int, default=0, help="Number of videos to generate (0 = infinite loop until Ctrl+C)")
     parser.add_argument("--bg-dir", type=str, default="backgrounds", help="Background videos directory")
     parser.add_argument("--out-dir", type=str, default="output_batch_videos", help="Output directory for generated videos")

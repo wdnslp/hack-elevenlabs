@@ -45,26 +45,59 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 SAMPLE_STORIES = [
     {
-        "id": "sample_01",
-        "subreddit": "AskReddit",
-        "author": "story_teller_99",
-        "title": "What is the most unsettling secret you discovered by accident?",
-        "body": "A few years ago, while cleaning out my grandfather's old attic, I stumbled across a small wooden box locked with a rusty padlock. When I finally got it open, I found a series of hand-drawn maps of our town from the 1950s, with several red X marks over locations that don't exist on modern maps.\n\nCuriosity got the better of me, so I decided to visit one of the marked locations on the edge of the local woods. Standing there, I realized it wasn't just an empty field — buried beneath layers of overgrown moss was a heavy metal cellar door chained shut from the outside. I couldn't open it, but when I leaned closer, I could hear a strange low mechanical humming coming from deep underground.",
-        "full_text": "What is the most unsettling secret you discovered by accident? A few years ago, while cleaning out my grandfather's old attic, I stumbled across a small wooden box locked with a rusty padlock. When I finally got it open, I found a series of hand-drawn maps of our town from the 1950s, with several red X marks over locations that don't exist on modern maps. Curiosity got the better of me, so I decided to visit one of the marked locations on the edge of the local woods. Standing there, I realized it wasn't just an empty field — buried beneath layers of overgrown moss was a heavy metal cellar door chained shut from the outside. I couldn't open it, but when I leaned closer, I could hear a strange low mechanical humming coming from deep underground.",
-        "upvotes": 14200,
-        "num_comments": 890,
-        "word_count": 135
+        "id": "ru_story_01",
+        "subreddit": "ru_Reddit",
+        "author": "alex_storyteller",
+        "title": "Какая самая странная или пугающая находка была в вашем доме?",
+        "body": "Переехал в старый хрущевский дом, который достался от прабабушки. Когда делал ремонт в прихожей и снимал старые деревянные панели со стены, обнаружил за ними небольшой тайник. Там лежала металлическая коробка 1960-х годов. Внутри были не деньги и не драгоценности, а несколько старых черно-белых фотографий нашей улицы и тетрадь. На фотографиях на крыше нашего дома стоял человек в странном плаще и смотрел строго в кадр. В тетради были аккуратно записаны даты и точное время — каждые 3 дня на протяжении 15 лет. Самое жуткое: последняя запись была сделана вчерашней датой, хотя в квартиру до меня никто не заходил уже лет пять.",
+        "full_text": "Какая самая странная или пугающая находка была в вашем доме? Переехал в старый хрущевский дом, который достался от прабабушки. Когда делал ремонт в прихожей и снимал старые деревянные панели со стены, обнаружил за ними небольшой тайник. Там лежала металлическая коробка 1960-х годов. Внутри были не деньги и не драгоценности, а несколько старых черно-белых фотографий нашей улицы и тетрадь. На фотографиях на крыше нашего дома стоял человек в странном плаще и смотрел строго в кадр. В тетради были аккуратно записаны даты и точное время — каждые 3 дня на протяжении 15 лет. Самое жуткое: последняя запись была сделана вчерашней датой, хотя в квартиру до меня никто не заходил уже лет пять.",
+        "upvotes": 18400,
+        "num_comments": 1120,
+        "word_count": 120
     },
     {
-        "id": "sample_02",
+        "id": "pikabu_story_02",
+        "subreddit": "pikabu",
+        "author": "pikabu_hero",
+        "title": "Как я отучил шумных соседей устраивать вечеринки по ночам",
+        "body": "Сверху заселилась компания студентов, которая каждую пятницу и субботу устраивала дискотеки до 4 утра. Разговоры и вызовы участкового не помогали — они просто открывали дверь, извинялись и через полчаса снова включали сабвуфер. Тогда я решил действовать технически. Купил виброколонку, прижал её к потолку в спальне прямо под их полом и настроил таймер на 6:00 утра — как раз когда они только засыпали. На колонку я поставил аудиозапись звука работающей болгарки, дрели и детского плача. Через 3 дня таких утренних подьемов соседи сами пришли ко мне с просьбой договориться и с тех пор после 23:00 у них полная тишина.",
+        "full_text": "Как я отучил шумных соседей устраивать вечеринки по ночам. Сверху заселилась компания студентов, которая каждую пятницу и субботу устраивала дискотеки до 4 утра. Разговоры и вызовы участкового не помогали — они просто открывали дверь, извинялись и через полчаса снова включали сабвуфер. Тогда я решил действовать технически. Купил виброколонку, прижал её к потолку в спальне прямо под их полом и настроил таймер на 6:00 утра — как раз когда они только засыпали. На колонку я поставил аудиозапись звука работающей болгарки, дрели и детского плача. Через 3 дня таких утренних подьемов соседи сами пришли ко мне с просьбой договориться и с тех пор после 23:00 у них полная тишина.",
+        "upvotes": 24500,
+        "num_comments": 1890,
+        "word_count": 130
+    },
+    {
+        "id": "askru_story_03",
+        "subreddit": "askru",
+        "author": "dmitry_v",
+        "title": "Какое самое неожиданное совпадение меняло вашу жизнь?",
+        "body": "Пять лет назад я опоздал на международный рейс из-за того, что у меня в метро порвался рюкзак и все вещи рассыпались по перрону. Я жутко расстроился, проклинал весь мир и вынужден был покупать новый билет на следующий день. В аэропорту, пока ждал переоформления, разговорился в очереди с девушкой, которая оказалась из моего же города и летела тем же направлением. Мы проговорили 4 часа подряд, обменялись контактами. Прошло пять лет — мы женаты, и у нас растет дочь. Тот порвавшийся рюкзак оказался лучшим событием в моей жизни.",
+        "full_text": "Какое самое неожиданное совпадение меняло вашу жизнь? Пять лет назад я опоздал на международный рейс из-за того, что у меня в метро порвался рюкзак и все вещи рассыпались по перрону. Я жутко расстроился, проклинал весь мир и вынужден был покупать новый билет на следующий день. В аэропорту, пока ждал переоформления, разговорился в очереди с девушкой, которая оказалась из моего же города и летела тем же направлением. Мы проговорили 4 часа подряд, обменялись контактами. Прошло пять лет — мы женаты, и у нас растет дочь. Тот порвавшийся рюкзак оказался лучшим событием в моей жизни.",
+        "upvotes": 16700,
+        "num_comments": 850,
+        "word_count": 115
+    },
+    {
+        "id": "trueoffmychest_story_04",
+        "subreddit": "TrueOffMyChest",
+        "author": "secret_keeper_88",
+        "title": "I accidentally discovered a hidden room behind the pantry in my new house",
+        "body": "When my wife and I bought our 1920s craftsman home last month, the inspector noted that the kitchen pantry wall seemed hollow. Last weekend I decided to knock down the old wooden shelving to rebuild it. Behind the rear wall, I found a small latch that opened a secret door leading down a spiral staircase into a subterranean room. Inside was a fully functioning vintage ham radio setup, complete with logbooks from 1962 detailing encrypted numbers stations and coordinates across Europe. The last log entry entry was dated just three weeks before we purchased the home.",
+        "full_text": "I accidentally discovered a hidden room behind the pantry in my new house. When my wife and I bought our 1920s craftsman home last month, the inspector noted that the kitchen pantry wall seemed hollow. Last weekend I decided to knock down the old wooden shelving to rebuild it. Behind the rear wall, I found a small latch that opened a secret door leading down a spiral staircase into a subterranean room. Inside was a fully functioning vintage ham radio setup, complete with logbooks from 1962 detailing encrypted numbers stations and coordinates across Europe. The last log entry entry was dated just three weeks before we purchased the home.",
+        "upvotes": 31200,
+        "num_comments": 2100,
+        "word_count": 140
+    },
+    {
+        "id": "amitheasshole_story_05",
         "subreddit": "AmItheAsshole",
-        "author": "curious_mind_42",
-        "title": "AITA for refusing to give my brother my heirloom watch after he lost his own?",
-        "body": "My grandfather passed down a vintage 1970s watch to me when I graduated college. It has immense sentimental value to me because he wore it every single day for over forty years before passing it down. My brother recently lost his own expensive watch during a drunken trip with friends and is now demanding that I give him mine since I don't wear it every day.\n\nI flatly refused, explaining that it is a family heirloom with personal meaning. Now my brother, along with my parents, are calling me selfish and saying family should share items during tough times. AITA?",
-        "full_text": "AITA for refusing to give my brother my heirloom watch after he lost his own? My grandfather passed down a vintage 1970s watch to me when I graduated college. It has immense sentimental value to me because he wore it every single day for over forty years before passing it down. My brother recently lost his own expensive watch during a drunken trip with friends and is now demanding that I give him mine since I don't wear it every day. I flatly refused, explaining that it is a family heirloom with personal meaning. Now my brother, along with my parents, are calling me selfish and saying family should share items during tough times. AITA?",
-        "upvotes": 9800,
-        "num_comments": 1240,
-        "word_count": 125
+        "author": "fair_play_guy",
+        "title": "AITA for exposing my coworker who took credit for my entire 6-month project?",
+        "body": "For six months I worked extra hours developing an automated workflow script for our company that saved over 200 hours of manual data entry per week. During the big quarterly presentation to upper management, a senior coworker presented my entire deck and took full credit, claiming he built it independently over the weekend. Instead of arguing during the meeting, I waited until he demonstrated the tool live. I remotely revoked his API access token from my laptop. When the demo crashed instantly on screen, I raised my hand and politely offered to log in with master developer credentials to fix it. My boss realized what happened immediately.",
+        "full_text": "AITA for exposing my coworker who took credit for my entire 6-month project? For six months I worked extra hours developing an automated workflow script for our company that saved over 200 hours of manual data entry per week. During the big quarterly presentation to upper management, a senior coworker presented my entire deck and took full credit, claiming he built it independently over the weekend. Instead of arguing during the meeting, I waited until he demonstrated the tool live. I remotely revoked his API access token from my laptop. When the demo crashed instantly on screen, I raised my hand and politely offered to log in with master developer credentials to fix it. My boss realized what happened immediately.",
+        "upvotes": 45800,
+        "num_comments": 3400,
+        "word_count": 145
     }
 ]
 
@@ -218,6 +251,55 @@ def fetch_top_stories(
         except Exception as e:
             print(f"❌ Error parsing stories: {e}")
     
+    if not valid_stories:
+        # Priority 3: Reddit Atom RSS Feeds
+        rss_urls = [
+            f"https://www.reddit.com/r/{subreddit}/top.rss?t=all",
+            f"https://www.reddit.com/r/{subreddit}/hot.rss"
+        ]
+        import xml.etree.ElementTree as ET
+        import html
+
+        for r_url in rss_urls:
+            try:
+                req = urllib.request.Request(r_url, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+                    "Accept": "application/atom+xml,application/xml,text/xml"
+                })
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    xml_bytes = resp.read()
+                    root = ET.fromstring(xml_bytes)
+                    for entry in root.findall('{http://www.w3.org/2005/Atom}entry'):
+                        title_el = entry.find('{http://www.w3.org/2005/Atom}title')
+                        id_el = entry.find('{http://www.w3.org/2005/Atom}id')
+                        content_el = entry.find('{http://www.w3.org/2005/Atom}content')
+
+                        title = title_el.text.strip() if title_el is not None and title_el.text else ""
+                        post_id = id_el.text.split('/')[-1] if id_el is not None and id_el.text else f"rss_{hash(title)}"
+                        
+                        body_raw = content_el.text if content_el is not None and content_el.text else ""
+                        body_clean = re.sub(r'<[^>]+>', ' ', body_raw)
+                        body_clean = clean_reddit_text(html.unescape(body_clean))
+
+                        full_text = f"{title}. {body_clean}".strip() if body_clean else title
+                        words = len(full_text.split())
+
+                        if min_words <= words <= max_words and post_id not in seen_ids:
+                            seen_ids.add(post_id)
+                            valid_stories.append({
+                                "id": post_id,
+                                "subreddit": subreddit,
+                                "author": "reddit_user",
+                                "title": title,
+                                "body": body_clean,
+                                "full_text": full_text,
+                                "upvotes": 5000,
+                                "num_comments": 400,
+                                "word_count": words
+                            })
+            except Exception:
+                pass
+
     if not valid_stories:
         print(f"ℹ️ Network request blocked. Using sample fallback stories for r/{subreddit}...")
         valid_stories = SAMPLE_STORIES

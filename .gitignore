@@ -6,3 +6,10 @@ backgrounds/*.mp4
 .DS_Store
 *.log
 .env
+ovpn_auth.txt
+ovpn_configs/
+*.ovpn
+*.crt
+*.der
+psiphon.exe
+
