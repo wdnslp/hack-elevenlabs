@@ -201,8 +201,10 @@ def run_infinite_batch_pipeline(
             story_id = f"{subreddit.lower()}_story_{story_counter:03d}_{raw_id}"
             total_display = "∞" if is_infinite else str(count)
 
+            story_url = story.get("url", f"https://www.reddit.com/r/{sub_name}/comments/{raw_id}")
             print("\n------------------------------------------------------------------")
             print(f"📌 BATCH ITEM [{story_counter}/{total_display}]: \"{title_ru[:65]}...\" (ID: {story_id})")
+            print(f"🔗 REDDIT LINK: {story_url}")
             print("------------------------------------------------------------------")
 
             # Format text with ElevenLabs tags

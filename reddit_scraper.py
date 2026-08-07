@@ -168,6 +168,7 @@ def fetch_top_stories(
 
                     if min_words <= words <= max_words:
                         seen_ids.add(post_id)
+                        post_url = f"https://www.reddit.com/r/{subreddit}/comments/{post_id}"
                         valid_stories.append({
                             "id": post_id,
                             "subreddit": subreddit,
@@ -175,6 +176,7 @@ def fetch_top_stories(
                             "title": title,
                             "body": body,
                             "full_text": full_text,
+                            "url": post_url,
                             "upvotes": upvotes,
                             "num_comments": num_comments,
                             "word_count": words
@@ -274,6 +276,9 @@ def fetch_top_stories(
                         id_el = entry.find('{http://www.w3.org/2005/Atom}id')
                         content_el = entry.find('{http://www.w3.org/2005/Atom}content')
 
+                        link_el = entry.find('{http://www.w3.org/2005/Atom}link')
+                        post_url = link_el.attrib.get('href', '') if link_el is not None else f"https://www.reddit.com/r/{subreddit}/comments/{post_id}"
+
                         title = title_el.text.strip() if title_el is not None and title_el.text else ""
                         post_id = id_el.text.split('/')[-1] if id_el is not None and id_el.text else f"rss_{hash(title)}"
                         
@@ -293,6 +298,7 @@ def fetch_top_stories(
                                 "title": title,
                                 "body": body_clean,
                                 "full_text": full_text,
+                                "url": post_url,
                                 "upvotes": 5000,
                                 "num_comments": 400,
                                 "word_count": words

@@ -35,16 +35,11 @@ CURRENT_STORY_DATA: Dict[str, Any] = {
 RECEIVED_STORY_CHUNKS: Dict[str, Dict[int, str]] = {}
 CHUNKS_LOCK = threading.Lock()
 
-PROTON_OVPN_FILES = [
-    "ca-free-5.protonvpn.udp.ovpn",
-    "nl-free-79.protonvpn.udp.ovpn",
-    "jp-free-23.protonvpn.udp.ovpn",
-    "no-free-5.protonvpn.udp.ovpn",
-    "mx-free-3.protonvpn.udp.ovpn",
-    "ch-free-3.protonvpn.udp.ovpn",
-    "nl-free-131.protonvpn.udp.ovpn",
-    "ca-free-26.protonvpn.udp.ovpn"
-]
+OVPN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ovpn_configs")
+if not os.path.exists(OVPN_DIR):
+    OVPN_DIR = os.path.expanduser(r"~\OpenVPN\config")
+
+PROTON_OVPN_FILES = [f for f in os.listdir(OVPN_DIR) if f.endswith(".ovpn")] if os.path.exists(OVPN_DIR) else ["ca-free-5.protonvpn.udp.ovpn"]
 CURRENT_PROTON_INDEX = 0
 PROTON_LOCK = threading.Lock()
 
