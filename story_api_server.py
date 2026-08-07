@@ -43,27 +43,44 @@ PROTON_OVPN_FILES = [f for f in os.listdir(OVPN_DIR) if f.endswith(".ovpn")] if 
 CURRENT_PROTON_INDEX = 0
 PROTON_LOCK = threading.Lock()
 
+CURRENT_OPENVPN_PROCESS = None
+
 def rotate_proton_openvpn_ip() -> bool:
-    """Automated IP rotation using OpenVPN GUI CLI for ProtonVPN."""
-    global CURRENT_PROTON_INDEX
+    """Automated IP rotation using silent OpenVPN CLI (zero GUI popups)."""
+    global CURRENT_PROTON_INDEX, CURRENT_OPENVPN_PROCESS
     import subprocess
 
-    openvpn_gui = r"C:\Program Files\OpenVPN\bin\openvpn-gui.exe"
-    if not os.path.exists(openvpn_gui):
-        print("⚠️ [AUTOROTATE WARN] openvpn-gui.exe not found!")
-        return False
+    openvpn_exe = r"C:\Program Files\OpenVPN\bin\openvpn.exe"
 
     with PROTON_LOCK:
         ovpn_file = PROTON_OVPN_FILES[CURRENT_PROTON_INDEX % len(PROTON_OVPN_FILES)]
         CURRENT_PROTON_INDEX += 1
 
-    print(f"⚡ [AUTOROTATE] Rotating IP via OpenVPN (ProtonVPN) to [{ovpn_file}]...")
+    ovpn_path = os.path.join(OVPN_DIR, ovpn_file)
+    print(f"⚡ [AUTOROTATE] Rotating IP silently via OpenVPN to [{ovpn_file}]...")
+
     try:
-        subprocess.run([openvpn_gui, "--command", "disconnect_all"], capture_output=True, timeout=8)
+        # Kill previous openvpn process silently
+        if CURRENT_OPENVPN_PROCESS is not None:
+            try:
+                CURRENT_OPENVPN_PROCESS.terminate()
+                CURRENT_OPENVPN_PROCESS.wait(timeout=2)
+            except Exception:
+                pass
+
+        subprocess.run(["taskkill", "/F", "/IM", "openvpn.exe"], capture_output=True)
+        subprocess.run(["taskkill", "/F", "/IM", "openvpn-gui.exe"], capture_output=True)
         time.sleep(1.0)
-        subprocess.run([openvpn_gui, "--connect", ovpn_file], capture_output=True, timeout=10)
-        time.sleep(3)
-        print(f"✅ [AUTOROTATE] Connected to ProtonVPN [{ovpn_file}]!")
+
+        creation_flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+        CURRENT_OPENVPN_PROCESS = subprocess.Popen(
+            [openvpn_exe, "--config", ovpn_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags
+        )
+        time.sleep(3.5)
+        print(f"✅ [AUTOROTATE] Connected silently to ProtonVPN [{ovpn_file}]!")
         return True
     except Exception as e:
         print(f"⚠️ [AUTOROTATE WARN] OpenVPN rotation failed: {e}")
