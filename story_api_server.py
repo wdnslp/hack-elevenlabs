@@ -44,47 +44,99 @@ CURRENT_PROTON_INDEX = 0
 PROTON_LOCK = threading.Lock()
 
 CURRENT_OPENVPN_PROCESS = None
+FAILED_OVPN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "failed_ovpn_servers.json")
+COOLDOWN_SECONDS = 3 * 24 * 3600  # 3 days in seconds (72 hours)
 
-def rotate_proton_openvpn_ip() -> bool:
-    """Automated IP rotation using silent OpenVPN CLI (zero GUI popups)."""
-    global CURRENT_PROTON_INDEX, CURRENT_OPENVPN_PROCESS
-    import subprocess
+def load_failed_ovpn_servers() -> Dict[str, float]:
+    """Load dictionary of failed servers and their failure timestamps."""
+    if os.path.exists(FAILED_OVPN_FILE):
+        try:
+            with open(FAILED_OVPN_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
 
-    openvpn_exe = r"C:\Program Files\OpenVPN\bin\openvpn.exe"
+def save_failed_ovpn_servers(failed_dict: Dict[str, float]):
+    """Save dictionary of failed servers to disk."""
+    try:
+        with open(FAILED_OVPN_FILE, "w", encoding="utf-8") as f:
+            json.dump(failed_dict, f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error saving failed OVPN list: {e}")
+
+def mark_ovpn_failed(ovpn_file: str):
+    """Mark an OVPN server as failed with current timestamp."""
+    failed_dict = load_failed_ovpn_servers()
+    failed_dict[ovpn_file] = time.time()
+    save_failed_ovpn_servers(failed_dict)
+    print(f"🚫 [AUTOROTATE] Marked server [{ovpn_file}] as FAILED! Placed on 3-day cooldown.")
+
+def mark_ovpn_success(ovpn_file: str):
+    """Remove server from failed list upon successful connection."""
+    failed_dict = load_failed_ovpn_servers()
+    if ovpn_file in failed_dict:
+        del failed_dict[ovpn_file]
+        save_failed_ovpn_servers(failed_dict)
+
+def get_next_available_ovpn_file() -> str:
+    """Get next OVPN server skipping any that failed within the last 3 days."""
+    global CURRENT_PROTON_INDEX
+    now = time.time()
+    failed_dict = load_failed_ovpn_servers()
 
     with PROTON_LOCK:
-        ovpn_file = PROTON_OVPN_FILES[CURRENT_PROTON_INDEX % len(PROTON_OVPN_FILES)]
-        CURRENT_PROTON_INDEX += 1
+        total = len(PROTON_OVPN_FILES)
+        if total == 0:
+            return "ca-free-5.protonvpn.udp.ovpn"
 
-    ovpn_path = os.path.join(OVPN_DIR, ovpn_file)
-    print(f"⚡ [AUTOROTATE] Rotating IP silently via OpenVPN to [{ovpn_file}]...")
+        for _ in range(total):
+            ovpn_file = PROTON_OVPN_FILES[CURRENT_PROTON_INDEX % total]
+            CURRENT_PROTON_INDEX += 1
 
-    try:
-        # Kill previous openvpn process silently
-        if CURRENT_OPENVPN_PROCESS is not None:
-            try:
-                CURRENT_OPENVPN_PROCESS.terminate()
-                CURRENT_OPENVPN_PROCESS.wait(timeout=2)
-            except Exception:
-                pass
+            last_failed = failed_dict.get(ovpn_file, 0)
+            elapsed = now - last_failed
+            if elapsed >= COOLDOWN_SECONDS:
+                return ovpn_file
+            else:
+                remaining_hours = (COOLDOWN_SECONDS - elapsed) / 3600.0
+                print(f"⏭️ [AUTOROTATE SKIPPED] [{ovpn_file}] is on 3-day cooldown ({remaining_hours:.1f}h remaining). Trying next...")
 
-        subprocess.run(["taskkill", "/F", "/IM", "openvpn.exe"], capture_output=True)
-        subprocess.run(["taskkill", "/F", "/IM", "openvpn-gui.exe"], capture_output=True)
-        time.sleep(1.0)
+        sorted_failed = sorted(failed_dict.items(), key=lambda x: x[1])
+        if sorted_failed:
+            oldest_file = sorted_failed[0][0]
+            print(f"⚠️ [AUTOROTATE NOTICE] All servers are on cooldown. Re-using oldest failed server [{oldest_file}].")
+            return oldest_file
 
-        creation_flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
-        CURRENT_OPENVPN_PROCESS = subprocess.Popen(
-            [openvpn_exe, "--config", ovpn_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=creation_flags
-        )
-        time.sleep(3.5)
-        print(f"✅ [AUTOROTATE] Connected silently to ProtonVPN [{ovpn_file}]!")
-        return True
-    except Exception as e:
-        print(f"⚠️ [AUTOROTATE WARN] OpenVPN rotation failed: {e}")
-        return False
+        return PROTON_OVPN_FILES[0]
+
+def rotate_proton_openvpn_ip() -> bool:
+    """Automated IP rotation using OpenVPN GUI CLI (Interactive Service) with automatic 3-day cooldown for failing servers."""
+    import subprocess
+
+    openvpn_gui = r"C:\Program Files\OpenVPN\bin\openvpn-gui.exe"
+    max_attempts = 5
+
+    for attempt in range(1, max_attempts + 1):
+        ovpn_file = get_next_available_ovpn_file()
+        print(f"⚡ [AUTOROTATE Attempt {attempt}/{max_attempts}] Connecting to [{ovpn_file}]...")
+
+        try:
+            subprocess.run([openvpn_gui, "--command", "disconnect_all"], capture_output=True, timeout=3)
+            time.sleep(0.5)
+
+            subprocess.Popen([openvpn_gui, "--command", "connect", ovpn_file])
+            time.sleep(3.5)
+
+            mark_ovpn_success(ovpn_file)
+            print(f"✅ [AUTOROTATE SUCCESS] Connected to ProtonVPN [{ovpn_file}]!")
+            return True
+        except Exception as e:
+            print(f"⚠️ [AUTOROTATE WARN] OpenVPN rotation attempt failed for [{ovpn_file}]: {e}")
+            mark_ovpn_failed(ovpn_file)
+
+    print("❌ [AUTOROTATE FATAL] Failed to connect after multiple server attempts.")
+    return False
 
 class StoryApiRequestHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
