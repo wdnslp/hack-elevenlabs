@@ -75,8 +75,14 @@ class StoryApiRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self._send_cors_headers()
             self.end_headers()
-            response_bytes = json.dumps(CURRENT_STORY_DATA, ensure_ascii=False).encode("utf-8")
+            data_to_send = dict(CURRENT_STORY_DATA)
+            story_id = data_to_send.get("story_id")
+            with CHUNKS_LOCK:
+                rec_count = len(RECEIVED_STORY_CHUNKS.get(story_id, {})) if story_id else 0
+            data_to_send["received_chunks_count"] = rec_count
+            response_bytes = json.dumps(data_to_send, ensure_ascii=False).encode("utf-8")
             self.wfile.write(response_bytes)
+
         else:
             self.send_response(404)
             self._send_cors_headers()

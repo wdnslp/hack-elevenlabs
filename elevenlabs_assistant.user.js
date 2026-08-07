@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ElevenLabs Assistant
 // @namespace    http://tampermonkey.net/
-// @version      4.3
-// @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Batch Workflow
+// @version      5.0
+// @description  ElevenLabs TTS Assistant with Smart 2-Stage Limit Detector, Local API Server Direct Upload & Full Auto-Batch Workflow
 // @match        https://elevenlabs.io/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
@@ -11,6 +11,7 @@
 // @connect      localhost
 // @run-at       document-start
 // ==/UserScript==
+
 
 
 
@@ -94,7 +95,7 @@
                     if (inputEl) inputEl.value = textToUse.trim();
 
                     chunks = splitText(textToUse.trim());
-                    currentChunkIdx = 0;
+                    currentChunkIdx = (data.received_chunks_count && data.received_chunks_count < chunks.length) ? data.received_chunks_count : 0;
                     document.getElementById('el-chunk-controls').style.display = 'block';
 
                     const storyTitle = data.title ? (data.title.substring(0, 45) + '...') : 'История';
@@ -104,6 +105,13 @@
                     log('🎉 АВТО-ПОДТЯНУТА ИСТОРИЯ' + batchProgress + ' [' + subInfo + ']: "' + storyTitle + '" (' + chunks.length + ' кусков)!', '#10b981');
                     showStatus('✅ Подтянута история' + batchProgress + ': "' + storyTitle + '" (' + chunks.length + ' кусков)', '#10b981');
                     updateUI();
+
+                    if (isAutoPlay && chunks.length > 0 && currentChunkIdx < chunks.length) {
+                        log('▶️ [АВТО-СТАРТ] Автоматический запуск куска ' + (currentChunkIdx + 1) + '/' + chunks.length + '...', '#34d399');
+                        setTimeout(function () {
+                            injectAndPlayChunk(currentChunkIdx);
+                        }, 1200);
+                    }
                 } else if (!isAutoPoll) {
                     log('⚠️ На сервере нет готовой истории (статус: idle).', '#f59e0b');
                     showStatus('⚠️ На локальном сервере нет подгруженной истории.', '#f59e0b');
@@ -161,11 +169,22 @@
                     if (resp.is_complete) {
                         log('🎉 ВСЕ КУСКИ ИСТОРИИ ОЗВУЧЕНЫ! Python начал генерацию видео...', '#f59e0b');
                         showStatus('🎉 История полностью передана! Ожидайте следующую...', '#10b981');
+                        setTimeout(function () {
+                            fetchStoryFromLocalServer(true);
+                        }, 2000);
                     } else {
-                        showStatus('✅ Кусок ' + (chunkIdx + 1) + '/' + totalChunks + ' передан в Python. Жмите дальше!', '#10b981');
+                        showStatus('✅ Кусок ' + (chunkIdx + 1) + '/' + totalChunks + ' передан в Python.', '#10b981');
+                        if (isAutoPlay && currentChunkIdx < totalChunks - 1) {
+                            currentChunkIdx++;
+                            log('⏭️ [АВТО-СЛЕДУЮЩИЙ КУСОК] Переход к куску ' + (currentChunkIdx + 1) + '/' + totalChunks + '...', '#38bdf8');
+                            setTimeout(function () {
+                                injectAndPlayChunk(currentChunkIdx);
+                            }, 1000);
+                        }
                     }
                 } catch (e) { }
             };
+
 
 
 
@@ -825,10 +844,17 @@
             selectRussianLanguage(function () {
                 selectVoiceDen(function () {
                     log('✅ Настройка языка и голоса завершена!', '#10b981');
+                    if (isAutoPlay && chunks.length > 0 && currentChunkIdx < chunks.length) {
+                        setTimeout(function () {
+                            log('🚀 [АВТО-ПОДХВАТ] Запуск генерации куска ' + (currentChunkIdx + 1) + '/' + chunks.length + '...', '#34d399');
+                            injectAndPlayChunk(currentChunkIdx);
+                        }, 800);
+                    }
                 });
             });
         }, 1000);
     }
+
 
 
     // --- 10. FLOATING UI WIDGET ---
@@ -854,7 +880,7 @@
             '.el-badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }',
             '</style>',
             '<div id="el-assistant-header">',
-            '  <span>🎙️ ElevenLabs v4.3</span>',
+            '  <span>🎙️ ElevenLabs v5.0 (Full Auto)</span>',
             '  <div style="display: flex; gap: 4px;">',
             '    <button id="el-btn-auto-voice" class="el-btn el-btn-sec" style="font-size: 11px; padding: 4px 8px;" title="Выбрать голос Den и русский язык">🎙️ Den + RU</button>',
             '    <button id="el-btn-clean-data" class="el-btn el-btn-red" title="Очистить куки и данные сайта">🧹 Сброс куки</button>',
@@ -883,12 +909,13 @@
             '    <button id="el-btn-download-now" class="el-btn el-btn-green" style="width: 100%;">⬇️ Скачать MP3 этого куска</button>',
             '  </div>',
             '</div>',
-            '<div id="el-status-bar">Готов к работе. Включен авто-пакетный режим с Python!</div>',
+            '<div id="el-status-bar">Готов к работе. Включена ПОЛНАЯ автоматизация с Python!</div>',
             '<div id="el-debug-log"><div>[Логи дебага появятся здесь]</div></div>'
         ].join('');
 
         document.body.appendChild(panel);
-        log('Запущен ElevenLabs Assistant v4.3!');
+        log('Запущен ElevenLabs Assistant v5.0 (Full Auto)!');
+
 
 
 
