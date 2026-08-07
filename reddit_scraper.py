@@ -45,56 +45,61 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 SAMPLE_STORIES = [
     {
-        "id": "ru_story_01",
+        "id": "16xb40g",
         "subreddit": "ru_Reddit",
         "author": "alex_storyteller",
         "title": "Какая самая странная или пугающая находка была в вашем доме?",
         "body": "Переехал в старый хрущевский дом, который достался от прабабушки. Когда делал ремонт в прихожей и снимал старые деревянные панели со стены, обнаружил за ними небольшой тайник. Там лежала металлическая коробка 1960-х годов. Внутри были не деньги и не драгоценности, а несколько старых черно-белых фотографий нашей улицы и тетрадь. На фотографиях на крыше нашего дома стоял человек в странном плаще и смотрел строго в кадр. В тетради были аккуратно записаны даты и точное время — каждые 3 дня на протяжении 15 лет. Самое жуткое: последняя запись была сделана вчерашней датой, хотя в квартиру до меня никто не заходил уже лет пять.",
         "full_text": "Какая самая странная или пугающая находка была в вашем доме? Переехал в старый хрущевский дом, который достался от прабабушки. Когда делал ремонт в прихожей и снимал старые деревянные панели со стены, обнаружил за ними небольшой тайник. Там лежала металлическая коробка 1960-х годов. Внутри были не деньги и не драгоценности, а несколько старых черно-белых фотографий нашей улицы и тетрадь. На фотографиях на крыше нашего дома стоял человек в странном плаще и смотрел строго в кадр. В тетради были аккуратно записаны даты и точное время — каждые 3 дня на протяжении 15 лет. Самое жуткое: последняя запись была сделана вчерашней датой, хотя в квартиру до меня никто не заходил уже лет пять.",
+        "url": "https://www.reddit.com/r/ru_Reddit/comments/16xb40g",
         "upvotes": 18400,
         "num_comments": 1120,
         "word_count": 120
     },
     {
-        "id": "pikabu_story_02",
+        "id": "bexgvw",
         "subreddit": "pikabu",
         "author": "pikabu_hero",
         "title": "Как я отучил шумных соседей устраивать вечеринки по ночам",
         "body": "Сверху заселилась компания студентов, которая каждую пятницу и субботу устраивала дискотеки до 4 утра. Разговоры и вызовы участкового не помогали — они просто открывали дверь, извинялись и через полчаса снова включали сабвуфер. Тогда я решил действовать технически. Купил виброколонку, прижал её к потолку в спальне прямо под их полом и настроил таймер на 6:00 утра — как раз когда они только засыпали. На колонку я поставил аудиозапись звука работающей болгарки, дрели и детского плача. Через 3 дня таких утренних подьемов соседи сами пришли ко мне с просьбой договориться и с тех пор после 23:00 у них полная тишина.",
         "full_text": "Как я отучил шумных соседей устраивать вечеринки по ночам. Сверху заселилась компания студентов, которая каждую пятницу и субботу устраивала дискотеки до 4 утра. Разговоры и вызовы участкового не помогали — они просто открывали дверь, извинялись и через полчаса снова включали сабвуфер. Тогда я решил действовать технически. Купил виброколонку, прижал её к потолку в спальне прямо под их полом и настроил таймер на 6:00 утра — как раз когда они только засыпали. На колонку я поставил аудиозапись звука работающей болгарки, дрели и детского плача. Через 3 дня таких утренних подьемов соседи сами пришли ко мне с просьбой договориться и с тех пор после 23:00 у них полная тишина.",
+        "url": "https://www.reddit.com/r/pikabu/comments/bexgvw",
         "upvotes": 24500,
         "num_comments": 1890,
         "word_count": 130
     },
     {
-        "id": "askru_story_03",
+        "id": "182e0j3",
         "subreddit": "askru",
         "author": "dmitry_v",
         "title": "Какое самое неожиданное совпадение меняло вашу жизнь?",
         "body": "Пять лет назад я опоздал на международный рейс из-за того, что у меня в метро порвался рюкзак и все вещи рассыпались по перрону. Я жутко расстроился, проклинал весь мир и вынужден был покупать новый билет на следующий день. В аэропорту, пока ждал переоформления, разговорился в очереди с девушкой, которая оказалась из моего же города и летела тем же направлением. Мы проговорили 4 часа подряд, обменялись контактами. Прошло пять лет — мы женаты, и у нас растет дочь. Тот порвавшийся рюкзак оказался лучшим событием в моей жизни.",
         "full_text": "Какое самое неожиданное совпадение меняло вашу жизнь? Пять лет назад я опоздал на международный рейс из-за того, что у меня в метро порвался рюкзак и все вещи рассыпались по перрону. Я жутко расстроился, проклинал весь мир и вынужден был покупать новый билет на следующий день. В аэропорту, пока ждал переоформления, разговорился в очереди с девушкой, которая оказалась из моего же города и летела тем же направлением. Мы проговорили 4 часа подряд, обменялись контактами. Прошло пять лет — мы женаты, и у нас растет дочь. Тот порвавшийся рюкзак оказался лучшим событием в моей жизни.",
+        "url": "https://www.reddit.com/r/askru/comments/182e0j3",
         "upvotes": 16700,
         "num_comments": 850,
         "word_count": 115
     },
     {
-        "id": "trueoffmychest_story_04",
+        "id": "t9m7fl",
         "subreddit": "TrueOffMyChest",
         "author": "secret_keeper_88",
         "title": "I accidentally discovered a hidden room behind the pantry in my new house",
         "body": "When my wife and I bought our 1920s craftsman home last month, the inspector noted that the kitchen pantry wall seemed hollow. Last weekend I decided to knock down the old wooden shelving to rebuild it. Behind the rear wall, I found a small latch that opened a secret door leading down a spiral staircase into a subterranean room. Inside was a fully functioning vintage ham radio setup, complete with logbooks from 1962 detailing encrypted numbers stations and coordinates across Europe. The last log entry entry was dated just three weeks before we purchased the home.",
         "full_text": "I accidentally discovered a hidden room behind the pantry in my new house. When my wife and I bought our 1920s craftsman home last month, the inspector noted that the kitchen pantry wall seemed hollow. Last weekend I decided to knock down the old wooden shelving to rebuild it. Behind the rear wall, I found a small latch that opened a secret door leading down a spiral staircase into a subterranean room. Inside was a fully functioning vintage ham radio setup, complete with logbooks from 1962 detailing encrypted numbers stations and coordinates across Europe. The last log entry entry was dated just three weeks before we purchased the home.",
+        "url": "https://www.reddit.com/r/TrueOffMyChest/comments/t9m7fl",
         "upvotes": 31200,
         "num_comments": 2100,
         "word_count": 140
     },
     {
-        "id": "amitheasshole_story_05",
+        "id": "1kq95ee",
         "subreddit": "AmItheAsshole",
         "author": "fair_play_guy",
         "title": "AITA for exposing my coworker who took credit for my entire 6-month project?",
         "body": "For six months I worked extra hours developing an automated workflow script for our company that saved over 200 hours of manual data entry per week. During the big quarterly presentation to upper management, a senior coworker presented my entire deck and took full credit, claiming he built it independently over the weekend. Instead of arguing during the meeting, I waited until he demonstrated the tool live. I remotely revoked his API access token from my laptop. When the demo crashed instantly on screen, I raised my hand and politely offered to log in with master developer credentials to fix it. My boss realized what happened immediately.",
         "full_text": "AITA for exposing my coworker who took credit for my entire 6-month project? For six months I worked extra hours developing an automated workflow script for our company that saved over 200 hours of manual data entry per week. During the big quarterly presentation to upper management, a senior coworker presented my entire deck and took full credit, claiming he built it independently over the weekend. Instead of arguing during the meeting, I waited until he demonstrated the tool live. I remotely revoked his API access token from my laptop. When the demo crashed instantly on screen, I raised my hand and politely offered to log in with master developer credentials to fix it. My boss realized what happened immediately.",
+        "url": "https://www.reddit.com/r/AmItheAsshole/comments/1kq95ee",
         "upvotes": 45800,
         "num_comments": 3400,
         "word_count": 145
